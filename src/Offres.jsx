@@ -1495,6 +1495,7 @@ function Offres() {
                     border-radius: 50%;
                     animation: spin 1s linear infinite;
                     margin: 0 auto 20px;
+                    align-items: center;
                 }
                 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
             `}</style>
