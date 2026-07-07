@@ -501,7 +501,7 @@ function Offres() {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
                 <div style={{ textAlign: 'center' }}>
-                    <div className="loading-spinner"></div>
+                    <center><div className="loading-spinner"></div></center>
                     <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b' }}>Chargement des offres...           </p>
                 </div>
             </div>
@@ -1495,7 +1495,6 @@ function Offres() {
                     border-radius: 50%;
                     animation: spin 1s linear infinite;
                     margin: 0 auto 20px;
-                    align-items: center;
                 }
                 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
             `}</style>
