@@ -747,12 +747,14 @@ function Candidats() {
 
     if (loading) {
         return (
-           <center> <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+           <center>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
                 <div style={{ textAlign: 'center' }}>
                     <div className="loading-spinner"></div>
                     <p style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#64748b' }}>Chargement des candidats...</p>
                 </div>
-            </div></center>
+            </div>
+            </center>
         );
     }
 
