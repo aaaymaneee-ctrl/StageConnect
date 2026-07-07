@@ -499,12 +499,12 @@ function Offres() {
 
     if (loading) {
         return (
-         <center>  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
                 <div style={{ textAlign: 'center' }}>
                     <div className="loading-spinner"></div>
                     <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b' }}>Chargement des offres...           </p>
                 </div>
-            </div></center> 
+            </div>
         );
     }
 
