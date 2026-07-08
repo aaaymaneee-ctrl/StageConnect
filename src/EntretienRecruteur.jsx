@@ -115,10 +115,19 @@ function EntretienRecruteur() {
             
             let allInterviews = [];
             
+            // Final decision statuses - these interviews are completely done
+            const finalStatuses = ['embauché', 'refusée_final', 'proposition_envoyee', 'embauche_acceptee', 'embauche_refusee'];
+            
             for (const offre of offres) {
                 if (!offre.candidatures) continue;
                 
                 for (const candidature of offre.candidatures) {
+                    // SKIP: Candidates with final decisions (already completed interviews)
+                    if (finalStatuses.includes(candidature.statut)) {
+                        continue;
+                    }
+                    
+                    // Only show active interviews (AI with score OR Real with scheduled slot)
                     if (
                         (candidature.interviewType === 'ai' && candidature.scoreEntretien) ||
                         (candidature.interviewType === 'reel' && candidature.creneauChoisi)
@@ -140,7 +149,7 @@ function EntretienRecruteur() {
                             offreEntreprise: offre.entreprise,
                             offreLocalisation: offre.localisation,
                             etudiantNom: etudiantNom,
-                            estTermine: ['embauché', 'refusée_final', 'proposition_envoyee', 'embauche_acceptee', 'embauche_refusee'].includes(candidature.statut)
+                            estTermine: false
                         });
                     }
                 }
@@ -169,6 +178,15 @@ function EntretienRecruteur() {
             setUser(parsedUser);
             if (parsedUser.role === 'Recruteur') {
                 fetchInterviews(parsedUser.id);
+                
+                // Set up polling every 15 seconds to check for status changes
+                const interval = setInterval(() => {
+                    fetchInterviews(parsedUser.id);
+                }, 15000);
+                
+                return () => {
+                    clearInterval(interval);
+                };
             } else {
                 setLoading(false);
             }
@@ -177,7 +195,7 @@ function EntretienRecruteur() {
 
     // --- ACTIONS FINALES ---
     const handleFinalDecision = async (offreId, candidatureId, decision) => {
-        if (!window.confirm(`Êtes-vous sûr de vouloir ${decision === 'proposition_envoyee' ? 'FAIRE UNE PROPOSITION' : 'REFUSER DÉFINITIVEMENT'} ce candidat ?`)) return;
+      
         
         setIsSubmitting(true);
         try {
@@ -196,22 +214,28 @@ function EntretienRecruteur() {
 
             if (res.ok) {
                 setMessage(`✅ ${decision === 'proposition_envoyee' ? 'Proposition envoyée' : 'Candidat refusé'} avec succès.`);
+                
+                // REMOVE the interview from the list immediately
+                setInterviews(prevInterviews => 
+                    prevInterviews.filter(interview => interview.candidatureId !== candidatureId)
+                );
+                
                 setShowModal(false);
-                fetchInterviews(user.id); 
                 setTimeout(() => setMessage(''), 4000);
             } else {
-                setMessage(`❌ Erreur lors de l'enregistrement de la décision.`);
+                setMessage("❌ Erreur lors de l'enregistrement de la décision.");
             }
         } catch (err) {
             console.error(err);
-            setMessage(`❌ Impossible de contacter le serveur.`);
+            setMessage("❌ Impossible de contacter le serveur.");
         } finally {
             setIsSubmitting(false);
         }
-    };  
+    };
 
     const handleTerminerVisio = async (offreId, candidatureId) => {
-        if (!window.confirm("Voulez-vous vraiment clôturer cet appel ? L'étudiant verra que l'entretien est terminé.")) return;
+     
+
         
         try {
             const res = await fetch(`https://pfe-backend-five.vercel.app/offres/${offreId}/candidatures/${candidatureId}/terminer-visio`, {
@@ -219,13 +243,17 @@ function EntretienRecruteur() {
             });
             
             if (res.ok) {
-                setMessage('✅ Entretien terminé. Vous pouvez maintenant saisir votre décision finale.');
-                fetchInterviews(user.id);
+                setMessage("✅ Entretien terminé. Vous pouvez maintenant saisir votre décision finale.");
+                
+                // IMMEDIATELY refresh the interviews
+                await fetchInterviews(user.id);
+                
+                setTimeout(() => setMessage(''), 4000);
             } else {
-                setMessage('❌ Erreur lors de la clôture de l\'entretien.');
+                setMessage("❌ Erreur lors de la clôture de l'entretien.");
             }
         } catch (err) {
-            setMessage('❌ Erreur de connexion au serveur.');
+            setMessage("❌ Erreur de connexion au serveur.");
         }
     };
 
@@ -244,15 +272,18 @@ function EntretienRecruteur() {
         );
     };
 
-    // Statistiques
+    const activeInterviews = interviews.filter(i => 
+        !['embauché', 'refusée_final', 'proposition_envoyee', 'embauche_acceptee', 'embauche_refusee'].includes(i.statut)
+    );
+
     const stats = {
-        total: interviews.length,
-        real: interviews.filter(i => i.interviewType === 'reel').length,
-        ai: interviews.filter(i => i.interviewType === 'ai').length,
-        enAttente: interviews.filter(i => i.statut === 'en attente').length,
-        enCours: interviews.filter(i => i.etapeEntretien === 'visio_en_cours').length,
-        termines: interviews.filter(i => i.estTermine).length,
-        aVenir: interviews.filter(i => i.creneauChoisi && !isInterviewPassed(i.creneauChoisi) && !isInterviewTime(i.creneauChoisi)).length
+        total: activeInterviews.length,
+        real: activeInterviews.filter(i => i.interviewType === 'reel').length,
+        ai: activeInterviews.filter(i => i.interviewType === 'ai').length,
+        enAttente: activeInterviews.filter(i => i.statut === 'en attente').length,
+        enCours: activeInterviews.filter(i => i.etapeEntretien === 'visio_en_cours').length,
+        termines: activeInterviews.filter(i => i.etapeEntretien === 'termine').length,
+        aVenir: activeInterviews.filter(i => i.creneauChoisi && !isInterviewPassed(i.creneauChoisi) && !isInterviewTime(i.creneauChoisi)).length
     };
 
     // Filtrage
@@ -263,7 +294,7 @@ function EntretienRecruteur() {
             i.offreTitre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             i.offreEntreprise?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchStatus = filterStatus === 'all' || 
-            (filterStatus === 'termine' && i.estTermine) ||
+            (filterStatus === 'termine' && i.etapeEntretien === 'termine') ||
             (filterStatus === 'en_cours' && i.etapeEntretien === 'visio_en_cours') ||
             (filterStatus === 'a_venir' && i.creneauChoisi && !isInterviewPassed(i.creneauChoisi) && !isInterviewTime(i.creneauChoisi)) ||
             (filterStatus === 'en_attente' && i.statut === 'en attente');
@@ -274,20 +305,29 @@ function EntretienRecruteur() {
     const isErrorMessage = safeMessageStr.includes('Erreur') || safeMessageStr.includes('Impossible');
 
     if (loading) {
-        return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', color: textSecondary }}>
-                <div style={{ animation: 'spin 1s linear infinite', marginBottom: '15px' }}>
-                    <FiActivity size={40} color="#6c63ff" />
-                </div>
-                <p style={{ fontWeight: 'bold', fontSize: '16px' }}>Chargement des entretiens...</p>
-                <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-            </div>
-        );
-    }
+    return (
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            width: '100%',
+            background: isDark ? '#0f172a' : '#f1f5f9',
+            color: isDark ? '#fefae0' : '#0f172a'
+        }}>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>
+                Chargement des entretiens...
+            </p>
+            
+        </div>
+    );
+}
 
     if (!user || user.role !== 'Recruteur') {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', width: '100%', background: isDark ? '#0f172a' : '#f1f5f9' }}>
                 <div style={{ textAlign: 'center', padding: '48px', background: cardBg, borderRadius: '20px', border: cardBorder, maxWidth: '440px' }}>
                     <FiLock size={50} style={{ color: '#ef4444', marginBottom: '20px' }} />
                     <h2 style={{ color: textPrimary }}>Accès Restreint</h2>
@@ -564,6 +604,7 @@ function EntretienRecruteur() {
                         const isPassed = isReal && isInterviewPassed(interview.creneauChoisi);
                         const timeUntil = isReal ? getTimeUntilInterview(interview.creneauChoisi) : null;
                         const hasDecision = ['embauché', 'refusée_final', 'proposition_envoyee', 'embauche_acceptee', 'embauche_refusee'].includes(interview.statut);
+                        const isTerminated = interview.etapeEntretien === 'termine' || interview.statut === 'evaluation_en_cours';
 
                         return (
                             <div 
@@ -706,29 +747,6 @@ function EntretienRecruteur() {
                                                     {timeUntil}
                                                 </span>
                                             )}
-                                            {canJoin && (
-                                                <span style={{
-                                                    display: 'inline-block',
-                                                    marginTop: '6px',
-                                                    padding: '2px 12px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '12px',
-                                                    fontWeight: 'bold',
-                                                    background: 'rgba(239,68,68,0.15)',
-                                                    color: '#ef4444',
-                                                    animation: 'pulse 2s infinite'
-                                                }}>
-                                                    <span style={{
-                                                        width: '6px',
-                                                        height: '6px',
-                                                        background: '#ef4444',
-                                                        borderRadius: '50%',
-                                                        display: 'inline-block',
-                                                        marginRight: '6px'
-                                                    }} />
-                                                    EN DIRECT
-                                                </span>
-                                            )}
                                         </div>
                                     ) : (
                                         <div style={{ fontSize: '13px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
@@ -742,7 +760,34 @@ function EntretienRecruteur() {
                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                     {isReal && !hasDecision && (
                                         <>
-                                            {interview.statut !== 'evaluation_en_cours' && (
+                                            {/* EN DIRECT indicator - SEPARATE from button */}
+                                            {canJoin && (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    padding: '6px 14px',
+                                                    borderRadius: '20px',
+                                                    background: 'rgba(239,68,68,0.15)',
+                                                    color: '#ef4444',
+                                                    fontSize: '12px',
+                                                    fontWeight: 'bold',
+                                                    animation: 'pulse 2s infinite'
+                                                }}>
+                                                    <span style={{
+                                                        width: '8px',
+                                                        height: '8px',
+                                                        background: '#ef4444',
+                                                        borderRadius: '50%',
+                                                        display: 'inline-block',
+                                                        animation: 'pulse 1.5s infinite'
+                                                    }} />
+                                                    EN DIRECT
+                                                </div>
+                                            )}
+
+                                            {/* Rejoindre button - only if not terminated */}
+                                            {interview.etapeEntretien !== 'termine' && interview.statut !== 'evaluation_en_cours' && (
                                                 <button
                                                     onClick={() => {
                                                         if (canJoin && interview.lienVisio) window.open(interview.lienVisio, '_blank');
@@ -788,7 +833,8 @@ function EntretienRecruteur() {
                                                 </button>
                                             )}
 
-                                            {interview.statut !== 'evaluation_en_cours' && canJoin && (
+                                            {/* Terminer button - only during active call */}
+                                            {interview.etapeEntretien !== 'termine' && interview.statut !== 'evaluation_en_cours' && canJoin && (
                                                 <button 
                                                     onClick={() => handleTerminerVisio(interview.offreId, interview.candidatureId)}
                                                     style={{ 
@@ -818,7 +864,8 @@ function EntretienRecruteur() {
                                                 </button>
                                             )}
                                             
-                                            {(isPassed || interview.statut === 'evaluation_en_cours') && (
+                                            {/* Décision button - show when terminated OR passed */}
+                                            {(isTerminated || isPassed) && !hasDecision && (
                                                 <button 
                                                     onClick={() => { setSelectedInterview(interview); setShowModal(true); }}
                                                     style={{ 
@@ -915,7 +962,7 @@ function EntretienRecruteur() {
                 )}
             </div>
 
-            {/* MODAL DE DÉCISION / DÉTAILS - Avec ModalPortal et fond flou complet */}
+            {/* MODAL DE DÉCISION / DÉTAILS */}
             {showModal && selectedInterview && (
                 <ModalPortal>
                     <div style={{
@@ -1172,7 +1219,6 @@ function EntretienRecruteur() {
                                         <>
                                             <button
                                                 onClick={() => {
-                                                    // Close the decision modal and open the calendar
                                                     setShowModal(false);
                                                     setSchedulingInterview(selectedInterview);
                                                 }}
@@ -1376,8 +1422,6 @@ function EntretienRecruteur() {
                     }}
                     onClose={() => {
                         setSchedulingInterview(null);
-                        // Optionally reopen the decision modal if needed
-                        // setShowModal(true);
                     }}
                     onConfirm={async (creneau) => {
                         try {
@@ -1387,7 +1431,7 @@ function EntretienRecruteur() {
 
                             console.log('📅 Planning interview with:', { safeCandidatureId, safeOffreId, safeEtudiantId, creneau });
 
-                            // 1. UPDATE STATUS: Tell the database this is now a Real Interview
+                            // 1. UPDATE STATUS
                             const updateRes = await fetch(`https://pfe-backend-five.vercel.app/offres/${safeOffreId}/candidatures/${safeCandidatureId}`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
@@ -1407,7 +1451,7 @@ function EntretienRecruteur() {
                                 return;
                             }
 
-                            // 2. SCHEDULE SLOT: Planify the interview
+                            // 2. SCHEDULE SLOT
                             const planifyRes = await fetch(`https://pfe-backend-five.vercel.app/creneaux/planifier-recruteur`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -1428,7 +1472,7 @@ function EntretienRecruteur() {
                                 setMessage(`✅ Entretien réel planifié avec succès pour le ${creneau.date} à ${creneau.heureDebut}.`);
                                 setSchedulingInterview(null);
                                 setShowModal(false);
-                                fetchInterviews(user.id);
+                                await fetchInterviews(user.id);
                                 setTimeout(() => setMessage(''), 5000);
                             } else {
                                 console.error('❌ Failed to schedule:', planifyData);

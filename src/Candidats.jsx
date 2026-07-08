@@ -1,4 +1,4 @@
-// Candidats.jsx - Merged Version (Typed Functions + File Design)
+// Candidats.jsx - Unified Version with One Button for All Pending Applications
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from './ThemeContext.jsx';
@@ -10,7 +10,8 @@ import {
   FiCalendar, FiStar, FiBarChart2, FiTrendingUp, FiAward, FiCpu, 
   FiEdit2, FiSend, FiFilter, FiSearch, FiRefreshCw, FiLock,
   FiVideo, FiMessageSquare, FiSave, FiEdit3, FiInbox, FiPlus, FiX,
-  FiSave as FiSaveIcon, FiGlobe, FiBookOpen, FiTarget,FiAlertCircle
+  FiSave as FiSaveIcon, FiGlobe, FiBookOpen, FiTarget, FiAlertCircle,
+  FiZap
 } from 'react-icons/fi';
 import { HiOutlineOfficeBuilding, HiOutlineDocumentText, HiOutlineUserGroup } from 'react-icons/hi';
 
@@ -60,18 +61,26 @@ function Candidats() {
     const roleColor = getRoleColor();
     const isLightMode = theme === 'light';
 
-    // Helper functions
-    const getUIText = (key) => {
-        const texts = {
-            pageTitle: { en: "Candidates Management", fr: "Gestion des Candidats", ar: "إدارة المرشحين" },
-            pageSubtitle: { en: "View, filter and manage applications", fr: "Consultez, filtrez et gérez les candidatures", ar: "عرض وتصفية وإدارة الطلبات" },
-            total: { en: "Total", fr: "Total", ar: "الإجمالي" },
-            pending: { en: "Pending", fr: "En attente", ar: "قيد الانتظار" },
-            accepted: { en: "Accepted", fr: "Acceptées", ar: "مقبولة" },
-            rejected: { en: "Rejected", fr: "Refusées", ar: "مرفوضة" },
-        };
-        return texts[key]?.['fr'] || key;
-    };
+    // Theme-aware style helpers
+    const textPrimary = isDark ? '#fefae0' : '#0f172a';
+    const textSecondary = isDark ? 'rgba(255, 255, 255, 0.6)' : '#64748b';
+    const textTertiary = isDark ? 'rgba(255, 255, 255, 0.5)' : '#64748b';
+    const textMuted = isDark ? 'rgba(255, 255, 255, 0.4)' : '#94a3b8';
+    const cardBg = isDark ? 'rgba(255, 255, 255, 0.06)' : '#ffffff';
+    const cardBgAlt = isDark ? 'rgba(255, 255, 255, 0.04)' : '#f8fafc';
+    const cardBorder = isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #e2e8f0';
+    const cardShadow = isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.04)';
+    const modalBg = isDark ? 'linear-gradient(135deg, #1e1e3f, #2c2c54)' : '#ffffff';
+    const modalBorder = isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid #e2e8f0';
+    const modalShadow = isDark ? '0 20px 60px rgba(0, 0, 0, 0.5)' : '0 20px 60px rgba(0, 0, 0, 0.1)';
+    const inputBg = isDark ? 'rgba(255, 255, 255, 0.06)' : '#f8fafc';
+    const inputBorder = isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid #cbd5e1';
+    const inputColor = isDark ? '#fefae0' : '#1e293b';
+    const btnSecondaryBg = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9';
+    const btnSecondaryBorder = isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid #cbd5e1';
+    const btnSecondaryColor = isDark ? 'rgba(255, 255, 255, 0.7)' : '#475569';
+    const sectionBorder = isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0';
+    const overlayBg = isDark ? 'rgba(0, 0, 0, 0.8)' : 'rgba(0, 0, 0, 0.4)';
 
     useEffect(() => {
         const userData = localStorage.getItem('user');
@@ -83,7 +92,7 @@ function Candidats() {
                     fetchRecruiterData(parsedUser.id);
                 }
             } catch (error) {
-                console.error("Erreur:", error);
+                console.error("Erreur lors de l'analyse des données utilisateur:", error);
                 setLoading(false);
             }
         } else {
@@ -91,8 +100,203 @@ function Candidats() {
         }
     }, []);
 
-    // --- NEW FUNCTIONS FROM TYPED VERSION ---
-    
+    // --- UNIFIED PROCESSING FUNCTION ---
+    const handleProcessAll = async (deployInterviewAI = true) => {
+        setIsAutoProcessing(true);
+        setShowAutoProcessModal(true);
+        setAutoProcessResults(null);
+        setAutoProcessProgress(0);
+        
+        const allPending = candidatures.filter(c => c.statut === 'en attente');
+        const total = allPending.length;
+        
+        const results = {
+            total: total,
+            acceptees: 0,
+            refusees: 0,
+            erreurs: 0,
+            details: []
+        };
+        
+        for (let i = 0; i < allPending.length; i++) {
+            const candidature = allPending[i];
+            const isAutomatic = candidature.typeCandidature === 'automatique';
+            
+            setAutoProcessProgress(Math.round(((i + 1) / total) * 100));
+            
+            if (isAutomatic) {
+                try {
+                    await updateCandidatureStatus(
+                        candidature.offreId, 
+                        candidature._id, 
+                        'acceptée',
+                        `Acceptée automatiquement. Score IA: ${candidature.scoreAuto || 70}%`
+                    );
+                    results.acceptees++;
+                    results.details.push({
+                        nom: `${candidature.etudiantInfo?.prenom || 'Inconnu'} ${candidature.etudiantInfo?.nom || ''}`,
+                        offre: candidature.offreTitre || 'Inconnue',
+                        statut: 'acceptée',
+                        raison: `Candidature IA (score: ${candidature.scoreAuto || 70}%)`,
+                        match: candidature.scoreAuto || 70,
+                        type: 'automatique'
+                    });
+                    
+                    if (deployInterviewAI) {
+                        const etudiantId = candidature.etudiantId?._id || candidature.etudiantId?.toString() || candidature.etudiantInfo?._id;
+                        await deployerInterviewAI(candidature._id, candidature.offreId, etudiantId);
+                    }
+                    continue;
+                } catch (err) {
+                    results.erreurs++;
+                    results.details.push({
+                        nom: `${candidature.etudiantInfo?.prenom || 'Inconnu'} ${candidature.etudiantInfo?.nom || ''}`,
+                        offre: candidature.offreTitre || 'Inconnue',
+                        statut: 'erreur',
+                        raison: `Erreur: ${err.message}`,
+                        type: 'automatique'
+                    });
+                    continue;
+                }
+            }
+            
+            try {
+                const etudiantId = candidature.etudiantId?._id || candidature.etudiantId?.toString() || candidature.etudiantInfo?._id;
+                const candidatureId = candidature._id?.toString() || candidature._id;
+                const offreId = candidature.offreId;
+                const etudiantName = `${candidature.etudiantInfo?.prenom || 'Inconnu'} ${candidature.etudiantInfo?.nom || ''}`;
+                
+                if (!etudiantId || !candidatureId || !offreId) {
+                    results.erreurs++;
+                    results.details.push({
+                        nom: etudiantName,
+                        offre: candidature.offreTitre || 'Inconnue',
+                        statut: 'erreur',
+                        raison: 'IDs manquants',
+                        match: 0,
+                        type: 'manuelle'
+                    });
+                    continue;
+                }
+                
+                const checkUserRes = await fetch(`https://pfe-backend-five.vercel.app/users/${etudiantId}`);
+                if (!checkUserRes.ok) {
+                    await updateCandidatureStatus(offreId, candidatureId, 'refusée', 
+                        `Refusée automatiquement : Profil étudiant inaccessible.`);
+                    results.refusees++;
+                    results.details.push({
+                        nom: etudiantName,
+                        offre: candidature.offreTitre,
+                        statut: 'refusée',
+                        raison: 'Profil inaccessible',
+                        match: 0,
+                        type: 'manuelle'
+                    });
+                    continue;
+                }
+                
+                const userData = await checkUserRes.json();
+                
+                if (!userData.cv || !userData.cv.filename) {
+                    await updateCandidatureStatus(offreId, candidatureId, 'refusée', 
+                        `Refusée automatiquement : Aucun CV téléchargé.`);
+                    results.refusees++;
+                    results.details.push({
+                        nom: etudiantName,
+                        offre: candidature.offreTitre,
+                        statut: 'refusée',
+                        raison: 'Aucun CV',
+                        match: 0,
+                        type: 'manuelle'
+                    });
+                    continue;
+                }
+                
+                const matchRes = await fetch(`https://pfe-backend-five.vercel.app/cv/match/${etudiantId}/${offreId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!matchRes.ok) {
+                    const scoreParDefaut = 70;
+                    await updateCandidatureStatus(offreId, candidatureId, 'acceptée',
+                        `Acceptée automatiquement. Analyse CV estimée: ${scoreParDefaut}%.`);
+                    results.acceptees++;
+                    const detail = {
+                        nom: etudiantName,
+                        offre: candidature.offreTitre,
+                        statut: 'acceptée',
+                        raison: `CV analysé (score estimé: ${scoreParDefaut}%)`,
+                        match: scoreParDefaut,
+                        type: 'manuelle'
+                    };
+                    if (deployInterviewAI) {
+                        await deployerInterviewAI(candidatureId, offreId, etudiantId);
+                        detail.deployed = true;
+                    }
+                    results.details.push(detail);
+                    continue;
+                }
+                
+                const matchData = await matchRes.json();
+                const matchPercentage = matchData.matchPercentage || 0;
+                const seuilAcceptation = 70;
+                
+                let nouveauStatut, commentaireText;
+                
+                if (matchPercentage >= seuilAcceptation) {
+                    nouveauStatut = 'acceptée';
+                    commentaireText = `Acceptée automatiquement après analyse IA du CV. Taux de correspondance: ${matchPercentage}%. ` +
+                        `Compétences trouvées: ${(matchData.matchedSkills || []).join(', ') || 'Aucune'}.`;
+                    results.acceptees++;
+                } else {
+                    nouveauStatut = 'refusée';
+                    commentaireText = `Refusée automatiquement après analyse IA du CV. Taux de correspondance: ${matchPercentage}% ` +
+                        `(seuil minimum: ${seuilAcceptation}%).`;
+                    results.refusees++;
+                }
+                
+                await updateCandidatureStatus(offreId, candidatureId, nouveauStatut, commentaireText);
+                
+                const detailItem = {
+                    nom: etudiantName,
+                    offre: candidature.offreTitre,
+                    statut: nouveauStatut,
+                    raison: matchPercentage >= seuilAcceptation 
+                        ? `Correspondance ${matchPercentage}%` 
+                        : `Correspondance insuffisante (${matchPercentage}% < ${seuilAcceptation}%)`,
+                    match: matchPercentage,
+                    skillsFound: matchData.matchedSkills || [],
+                    skillsMissing: matchData.missingSkills || [],
+                    type: 'manuelle'
+                };
+                if (nouveauStatut === 'acceptée' && deployInterviewAI) {
+                    await deployerInterviewAI(candidatureId, offreId, etudiantId);
+                    detailItem.deployed = true;
+                }
+                results.details.push(detailItem);
+            } catch (err) {
+                console.error(`Exception:`, err);
+                results.erreurs++;
+                results.details.push({
+                    nom: `${candidature.etudiantInfo?.prenom || 'Inconnu'} ${candidature.etudiantInfo?.nom || ''}`,
+                    offre: candidature.offreTitre || 'Inconnue',
+                    statut: 'erreur',
+                    raison: `Exception: ${err.message}`,
+                    match: 0,
+                    type: 'manuelle'
+                });
+            }
+        }
+        
+        setAutoProcessResults(results);
+        setIsAutoProcessing(false);
+        
+        setTimeout(() => {
+            fetchRecruiterData(user.id);
+        }, 1500);
+    };
+
     const fetchRecruiterSlots = async (recruteurId) => {
         setLoadingSlots(true);
         try {
@@ -139,7 +343,7 @@ function Candidats() {
 
     const planifierEntretien = async (candidatureId, offreId, etudiantId, creneauData) => {
         try {
-            const res = await fetch('https://pfe-backend-five.vercel.app/creneaux/planifier-recruteur', {
+            const res = await fetch(`https://pfe-backend-five.vercel.app/creneaux/planifier-recruteur`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -156,18 +360,18 @@ function Candidats() {
             const data = await res.json();
             
             if (res.ok) {
-                setMessage("✅ Entretien planifié avec succès !");
+                setMessage("Entretien planifié avec succès !");
                 setTimeout(() => setMessage(''), 5000);
                 fetchRecruiterData(user.id);
                 return true;
             } else {
-                setMessage("❌ Erreur lors de la planification");
+                setMessage("Erreur lors de la planification");
                 setTimeout(() => setMessage(''), 4000);
                 return false;
             }
         } catch (err) {
             console.error("Erreur:", err);
-            setMessage("❌ Impossible de se connecter au serveur.");
+            setMessage("Impossible de se connecter au serveur.");
             setTimeout(() => setMessage(''), 4000);
             return false;
         }
@@ -188,10 +392,9 @@ function Candidats() {
             }
             
             const data = await res.json();
-            console.log("✅ Statut mis à jour: " + statut);
             return data;
         } catch (err) {
-            console.error("❌ Exception mise à jour: " + err);
+            console.error("Exception mise à jour: " + err);
             throw err;
         }
     };
@@ -206,7 +409,7 @@ function Candidats() {
             const data = await res.json();
 
             if (res.ok) {
-                setMessage("✅ Candidature mise à jour avec succès.");
+                setMessage("Candidature mise à jour avec succès.");
                 setCandidatures(prevCandidatures =>
                     prevCandidatures.map(c =>
                         c._id === candidatureId ? { ...c, statut, commentaire: commentaireText } : c
@@ -215,12 +418,12 @@ function Candidats() {
                 setTimeout(() => setMessage(''), 3000);
                 return true;
             } else {
-                setMessage(data.error || "❌ Erreur lors de la mise à jour.");
+                setMessage("" + (data.error || "Erreur lors de la mise à jour."));
                 return false;
             }
         } catch (err) {
             console.error("Erreur:", err);
-            setMessage("❌ Impossible de se connecter au serveur.");
+            setMessage("Impossible de se connecter au serveur.");
             return false;
         }
     };
@@ -235,10 +438,9 @@ function Candidats() {
             
             if (res.ok) {
                 const data = await res.json();
-                console.log('✅ Interview AI déployée:', data);
                 return true;
             } else {
-                console.error("❌ Erreur déploiement interview AI");
+                console.error("Erreur déploiement interview AI");
                 return false;
             }
         } catch (err) {
@@ -248,7 +450,7 @@ function Candidats() {
     };
 
     const deployerEntretienReel = async (candidatureId, offreId, etudiantId) => {
-        console.log('🚀 deployerEntretienReel appelé avec:', { candidatureId, offreId, etudiantId });
+        console.log('deployerEntretienReel appelé avec:', { candidatureId, offreId, etudiantId });
         
         try {
             const res = await fetch(`https://pfe-backend-five.vercel.app/entretien/deployer-reel`, {
@@ -263,22 +465,21 @@ function Candidats() {
             });
             
             const data = await res.json();
-            console.log('📡 Réponse serveur deployer-reel:', data);
+            console.log('Réponse serveur deployer-reel:', data);
             
             if (res.ok) {
-                console.log("✅ Entretien réel activé - étape:", data.etape);
-                setMessage("✅ Entretien réel activé ! Choisissez maintenant un créneau.");
+                setMessage("Entretien réel activé ! Choisissez maintenant un créneau.");
                 setTimeout(() => setMessage(''), 5000);
                 fetchRecruiterData(user.id);
                 return true;
             } else {
-                console.error('❌ Erreur serveur:', data.error);
-                setMessage(data.error || '❌ Erreur lors de l\'activation');
+                console.error('Erreur serveur:', data.error);
+                setMessage("" + (data.error || 'Erreur lors de l\'activation'));
                 return false;
             }
         } catch (err) {
-            console.error('❌ Erreur réseau:', err);
-            setMessage("❌ Impossible de se connecter au serveur.");
+            console.error("Erreur réseau:", err);
+            setMessage("Impossible de se connecter au serveur.");
             return false;
         }
     };
@@ -295,7 +496,7 @@ function Candidats() {
                         body: JSON.stringify({ idOffre: offreId, idCandidature: candidatureId })
                     });
                     if (res.ok) {
-                        setMessage("✅ Entretien terminé ! Vous pouvez maintenant prendre votre décision finale.");
+                        setMessage("Entretien terminé ! Vous pouvez maintenant prendre votre décision finale.");
                         setCandidatures(prevCandidatures => 
                             prevCandidatures.map(c => 
                                 c._id === candidatureId ? { ...c, etapeEntretien: 'termine' } : c
@@ -303,230 +504,55 @@ function Candidats() {
                         );
                         setTimeout(() => setMessage(''), 4000);
                     } else {
-                        setMessage("❌ Erreur lors de la clôture.");
+                        setMessage("Erreur lors de la clôture.");
                     }
                 } catch(e) {
-                    setMessage("❌ Erreur de connexion au serveur.");
+                    setMessage("Erreur de connexion au serveur.");
                 }
             }
         });
     };
 
-    const handleAutoProcessManuel = async (deployInterview_ai = true) => {
-        setIsAutoProcessing(true);
-        setShowAutoProcessModal(true);
-        setAutoProcessResults(null);
-        setAutoProcessProgress(0);
+    // --- CV DOWNLOAD FIX: Uses UNIQUE key (candidatureId + etudiantId) ---
+    const handleDownloadCV = async (etudiantId, etudiantName, candidatureId) => {
+        const loadingKey = `${candidatureId}-${etudiantId}`;
         
-        const manuellesEnAttente = candidaturesManuelles.filter(c => c.statut === 'en attente');
-        const total = manuellesEnAttente.length;
+        setCvLoading(prev => ({ ...prev, [loadingKey]: true }));
         
-        const results = {
-            total: total,
-            acceptees: 0,
-            refusees: 0,
-            erreurs: 0,
-            details: []
-        };
-        
-        for (let i = 0; i < manuellesEnAttente.length; i++) {
-            const candidature = manuellesEnAttente[i];
-            
-            const etudiantId = candidature.etudiantId?._id || candidature.etudiantId?.toString() || candidature.etudiantInfo?._id;
-            const candidatureId = candidature._id?.toString() || candidature._id;
-            const offreId = candidature.offreId;
-            const etudiantName = `${candidature.etudiantInfo?.prenom || 'Inconnu'} ${candidature.etudiantInfo?.nom || ''}`;
-            
-            setAutoProcessProgress(Math.round(((i + 1) / total) * 100));
-            
-            if (!etudiantId || !candidatureId || !offreId) {
-                results.erreurs++;
-                results.details.push({
-                    nom: etudiantName,
-                    offre: candidature.offreTitre || 'Inconnue',
-                    statut: 'erreur',
-                    raison: 'IDs manquants',
-                    match: 0
-                });
-                continue;
-            }
-            
-            try {
-                const checkUserRes = await fetch(`https://pfe-backend-five.vercel.app/users/${etudiantId}`);
-                
-                if (!checkUserRes.ok) {
-                    await updateCandidatureStatus(offreId, candidatureId, 'refusée', 
-                        `❌ Refusée automatiquement : Profil étudiant inaccessible.`);
-                    results.refusees++;
-                    results.details.push({
-                        nom: etudiantName,
-                        offre: candidature.offreTitre,
-                        statut: 'refusée',
-                        raison: 'Profil inaccessible',
-                        match: 0
-                    });
-                    continue;
-                }
-                
-                const userData = await checkUserRes.json();
-                
-                if (!userData.cv || !userData.cv.filename) {
-                    await updateCandidatureStatus(offreId, candidatureId, 'refusée', 
-                        `❌ Refusée automatiquement : Aucun CV téléchargé.`);
-                    results.refusees++;
-                    results.details.push({
-                        nom: etudiantName,
-                        offre: candidature.offreTitre,
-                        statut: 'refusée',
-                        raison: 'Aucun CV',
-                        match: 0
-                    });
-                    continue;
-                }
-                
-                const matchRes = await fetch(`https://pfe-backend-five.vercel.app/cv/match/${etudiantId}/${offreId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                if (!matchRes.ok) {
-                    const errorText = await matchRes.text();
-                    console.error(`❌ Erreur API match: ${matchRes.status} - ${errorText}`);
-                    
-                    const cvTextRes = await fetch(`https://pfe-backend-five.vercel.app/cv-text/${etudiantId}`);
-                    
-                    if (!cvTextRes.ok) {
-                        results.erreurs++;
-                        results.details.push({
-                            nom: etudiantName,
-                            offre: candidature.offreTitre,
-                            statut: 'erreur',
-                            raison: `Erreur analyse CV (${matchRes.status})`,
-                            match: 0
-                        });
-                        continue;
-                    }
-                    
-                    const cvData = await cvTextRes.json();
-                    const scoreParDefaut = 70;
-                    
-                    await updateCandidatureStatus(offreId, candidatureId, 'acceptée',
-                        `✅ Acceptée automatiquement. CV analysé avec succès. Score estimé: ${scoreParDefaut}%.`);
-                    results.acceptees++;
-                    const detail = {
-                        nom: etudiantName,
-                        offre: candidature.offreTitre,
-                        statut: 'acceptée',
-                        raison: `CV analysé (score estimé: ${scoreParDefaut}%)`,
-                        match: scoreParDefaut
-                    };
-                    if (deployInterview_ai) {
-                        await deployerInterviewAI(candidatureId, offreId, etudiantId);
-                        detail.deployed = true;
-                    }
-                    results.details.push(detail);
-                    continue;
-                }
-                
-                const matchData = await matchRes.json();
-                const matchPercentage = matchData.matchPercentage || 0;
-                const seuilAcceptation = 70;
-                
-                let nouveauStatut, commentaireText;
-                
-                if (matchPercentage >= seuilAcceptation) {
-                    nouveauStatut = 'acceptée';
-                    commentaireText = `✅ Acceptée automatiquement après analyse IA du CV. Taux de correspondance: ${matchPercentage}%. ` +
-                        `Compétences trouvées: ${(matchData.matchedSkills || []).join(', ') || 'Aucune'}. ` +
-                        `Compétences manquantes: ${(matchData.missingSkills || []).join(', ') || 'Aucune'}.`;
-                    results.acceptees++;
-                } else {
-                    nouveauStatut = 'refusée';
-                    commentaireText = `❌ Refusée automatiquement après analyse IA du CV. Taux de correspondance: ${matchPercentage}% ` +
-                        `(seuil minimum: ${seuilAcceptation}%). ` +
-                        `Compétences trouvées: ${(matchData.matchedSkills || []).join(', ') || 'Aucune'}. ` +
-                        `Compétences manquantes: ${(matchData.missingSkills || []).join(', ') || 'Aucune'}.`;
-                    results.refusees++;
-                }
-                
-                await updateCandidatureStatus(offreId, candidatureId, nouveauStatut, commentaireText);
-                
-                const detailItem = {
-                    nom: etudiantName,
-                    offre: candidature.offreTitre,
-                    statut: nouveauStatut,
-                    raison: matchPercentage >= seuilAcceptation 
-                        ? `Correspondance ${matchPercentage}%` 
-                        : `Correspondance insuffisante (${matchPercentage}% < ${seuilAcceptation}%)`,
-                    match: matchPercentage,
-                    skillsFound: matchData.matchedSkills || [],
-                    skillsMissing: matchData.missingSkills || []
-                };
-                if (nouveauStatut === 'acceptée' && deployInterview_ai) {
-                    await deployerInterviewAI(candidatureId, offreId, etudiantId);
-                    detailItem.deployed = true;
-                }
-                results.details.push(detailItem);
-            } catch (err) {
-                console.error(`❌ Exception:`, err);
-                results.erreurs++;
-                results.details.push({
-                    nom: etudiantName,
-                    offre: candidature.offreTitre || 'Inconnue',
-                    statut: 'erreur',
-                    raison: `Exception: ${err.message}`,
-                    match: 0
-                });
-            }
-        }
-        
-        setAutoProcessResults(results);
-        setIsAutoProcessing(false);
-        
-        setTimeout(() => {
-            fetchRecruiterData(user.id);
-        }, 1500);
-    };
-
-    const handleAcceptAllAI = async (deployInterview_ai) => {
-        setIsAcceptingAll(true);
         try {
-            const res = await fetch(`https://pfe-backend-five.vercel.app/offres/accept-all-ai/${user.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    commentaire: acceptAllComment || 'Acceptée automatiquement - Décision IA',
-                    deployInterview: deployInterview_ai
-                })
-            });
-            const data = await res.json();
-
-            if (res.ok) {
-                setMessage(`✅ ${data.totalAccepted} candidature(s) AI acceptée(s) avec succès!`);
-                
-                if (deployInterview_ai && data.acceptedIds) {
-                    for (const item of data.acceptedIds) {
-                        await deployerInterviewAI(item.candidatureId, item.offreId, item.etudiantId);
-                    }
-                    setMessage(`✅ ${data.totalAccepted} candidature(s) acceptée(s) et interviews déployées!`);
-                }
-                
-                setShowAcceptAllModal(false);
-                setAcceptAllComment('');
-                fetchRecruiterData(user.id);
+            const checkRes = await fetch(`https://pfe-backend-five.vercel.app/users/${etudiantId}`);
+            const userData = await checkRes.json();
+            
+            if (!userData.cv || !userData.cv.filename) {
+                setMessage(`❌ ${etudiantName} n'a pas encore téléchargé de CV.`);
                 setTimeout(() => setMessage(''), 4000);
-            } else {
-                setMessage(data.error || "❌ Erreur lors de l'acceptation en masse.");
+                setCvLoading(prev => ({ ...prev, [loadingKey]: false }));
+                return;
             }
+            
+            const response = await fetch(`https://pfe-backend-five.vercel.app/users/${etudiantId}/cv`);
+            if (!response.ok) throw new Error('CV non trouvé');
+            
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = userData.cv.originalName || `CV_${etudiantName.replace(/\s+/g, '_')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            setMessage(`✅ CV de ${etudiantName} téléchargé avec succès.`);
+            setTimeout(() => setMessage(''), 3000);
         } catch (err) {
             console.error("Erreur:", err);
-            setMessage("❌ Impossible de se connecter au serveur.");
+            setMessage(`❌ Impossible de télécharger le CV de ${etudiantName}.`);
+            setTimeout(() => setMessage(''), 4000);
         } finally {
-            setIsAcceptingAll(false);
+            setCvLoading(prev => ({ ...prev, [loadingKey]: false }));
         }
     };
-
-    // --- END NEW FUNCTIONS ---
 
     const fetchRecruiterData = async (recruiterId) => {
         try {
@@ -565,7 +591,11 @@ function Candidats() {
                 }
             }
             allCandidatures.sort((a, b) => new Date(b.dateCandidature) - new Date(a.dateCandidature));
-            setCandidatures(allCandidatures);
+            
+            const candidaturesActives = allCandidatures.filter(c => 
+                !['proposition_envoyee', 'embauche_acceptee', 'embauche_refusee'].includes(c.statut)
+            );
+            setCandidatures(candidaturesActives);
         } catch (err) {
             console.error("Erreur:", err);
             setMessage("Impossible de charger les candidatures.");
@@ -642,39 +672,6 @@ function Candidats() {
         });
     };
 
-    const handleDownloadCV = async (etudiantId, etudiantName) => {
-        setCvLoading(prev => ({ ...prev, [etudiantId]: true }));
-        try {
-            const checkRes = await fetch(`https://pfe-backend-five.vercel.app/users/${etudiantId}`);
-            const userData = await checkRes.json();
-            if (!userData.cv || !userData.cv.filename) {
-                setMessage(`❌ ${etudiantName} n'a pas encore téléchargé de CV.`);
-                setTimeout(() => setMessage(''), 4000);
-                setCvLoading(prev => ({ ...prev, [etudiantId]: false }));
-                return;
-            }
-            const response = await fetch(`https://pfe-backend-five.vercel.app/users/${etudiantId}/cv`);
-            if (!response.ok) throw new Error('CV non trouvé');
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = userData.cv.originalName || `CV_${etudiantName.replace(/\s+/g, '_')}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            setMessage(`✅ CV de ${etudiantName} téléchargé avec succès.`);
-            setTimeout(() => setMessage(''), 3000);
-        } catch (err) {
-            console.error("Erreur:", err);
-            setMessage(`❌ Impossible de télécharger le CV de ${etudiantName}.`);
-            setTimeout(() => setMessage(''), 4000);
-        } finally {
-            setCvLoading(prev => ({ ...prev, [etudiantId]: false }));
-        }
-    };
-
     const renderStatut = (statut) => {
         let label, color, icon;
         switch (statut) {
@@ -746,17 +743,24 @@ function Candidats() {
     };
 
     if (loading) {
-        return (
-           
-            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div className="loading-spinner"></div>
-                    <p style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#64748b' }}>Chargement des candidats...</p>
-                </div>
-            </div>
-            
-        );
-    }
+    return (
+        <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            minHeight: '100vh',
+            width: '100%',
+            background: isDark ? '#0f172a' : '#f1f5f9',
+            color: isDark ? '#fefae0' : '#0f172a'
+        }}>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>
+                Chargement des candidats...
+            </p>
+        </div>
+    );
+}
 
     if (!user || user.role !== 'Recruteur') {
         return (
@@ -793,7 +797,6 @@ function Candidats() {
         );
     }
 
-    // Stats calculations
     const candidaturesAutomatiques = candidatures.filter(c => c.typeCandidature === 'automatique');
     const candidaturesManuelles = candidatures.filter(c => c.typeCandidature !== 'automatique');
 
@@ -825,20 +828,6 @@ function Candidats() {
     };
 
     const manuellesEnAttenteCount = candidaturesManuelles.filter(c => c.statut === 'en attente').length;
-
-    const statsAI = {
-        total: candidaturesAutomatiques.length,
-        enAttente: candidaturesAutomatiques.filter(c => c.statut === 'en attente').length,
-        acceptees: candidaturesAutomatiques.filter(c => c.statut === 'acceptée').length,
-        refusees: candidaturesAutomatiques.filter(c => c.statut === 'refusée').length
-    };
-
-    const statsManuel = {
-        total: candidaturesManuelles.length,
-        enAttente: candidaturesManuelles.filter(c => c.statut === 'en attente').length,
-        acceptees: candidaturesManuelles.filter(c => c.statut === 'acceptée').length,
-        refusees: candidaturesManuelles.filter(c => c.statut === 'refusée').length
-    };
 
     const safeMessageStr = String(message?.props?.children || message);
     const isErrorMessage = safeMessageStr.includes('Erreur') || safeMessageStr.includes('Impossible');
@@ -876,52 +865,14 @@ function Candidats() {
                 </div>
                 
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    {candidaturesAutomatiques.filter(c => c.statut === 'en attente').length > 0 && (
-                        <button
-    onClick={() => {
-        setDeployAction('accept_all_ai');
-        setDeployData({
-            count: candidaturesAutomatiques.filter(c => c.statut === 'en attente').length,
-            type: 'automatiques'
-        });
-        setShowDeployModal(true);
-    }}
-    style={{
-        padding: '12px 24px',
-        background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,  // ← UPDATED
-        color: 'white',
-        border: 'none',
-        borderRadius: '10px',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: 'bold',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        whiteSpace: 'nowrap',
-        transition: 'all 0.3s ease',
-        boxShadow: `0 4px 12px ${roleColor}40`  // ← ADD THIS
-    }}
-    onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = `0 6px 20px ${roleColor}50`;
-    }}
-    onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = `0 4px 12px ${roleColor}40`;
-    }}
->
-    <FiCpu /> Accepter et Déployer AI ({candidaturesAutomatiques.filter(c => c.statut === 'en attente').length})
-</button>
-                    )}
-                    
-                    {manuellesEnAttenteCount > 0 && (
+                    {candidatures.filter(c => c.statut === 'en attente').length > 0 && (
                         <button
                             onClick={() => {
-                                setDeployAction('analyse_manual');
+                                const totalPending = candidatures.filter(c => c.statut === 'en attente').length;
+                                setDeployAction('process_all');
                                 setDeployData({
-                                    count: manuellesEnAttenteCount,
-                                    type: 'manuelles'
+                                    count: totalPending,
+                                    type: 'all'
                                 });
                                 setShowDeployModal(true);
                             }}
@@ -929,8 +880,8 @@ function Candidats() {
                             style={{
                                 padding: '12px 24px',
                                 background: isAutoProcessing 
-                                    ? (isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0') 
-                                    : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                    ? (isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0')
+                                    : `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
                                 color: isAutoProcessing ? (isDark ? 'rgba(255,255,255,0.5)' : '#94a3b8') : 'white',
                                 border: 'none',
                                 borderRadius: '10px',
@@ -942,44 +893,59 @@ function Candidats() {
                                 gap: '8px',
                                 whiteSpace: 'nowrap',
                                 opacity: isAutoProcessing ? 0.7 : 1,
-                                transition: 'all 0.3s'
+                                transition: 'all 0.3s',
+                                boxShadow: isAutoProcessing ? 'none' : `0 4px 12px ${roleColor}40`
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!isAutoProcessing) {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = `0 6px 20px ${roleColor}50`;
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = `0 4px 12px ${roleColor}40`;
                             }}
                         >
-                            {isAutoProcessing ? <><FiClock /> Analyse en cours...</> : <><FiSearch /> Analyser et Déployer ({manuellesEnAttenteCount})</>}
+                            {isAutoProcessing ? (
+                                <><FiClock /> Analyse en cours...</>
+                            ) : (
+                                <><FiZap /> Traiter toutes les candidatures ({candidatures.filter(c => c.statut === 'en attente').length})</>
+                            )}
                         </button>
                     )}
                     
-                    <Link to="/dashboard/offres">
-    <button style={{
-        padding: '12px 24px',
-        background: isDark ? `rgba(255, 107, 107, 0.2)` : '#fef2f2',  // ← UPDATED
-        color: '#ff6b6b',  // ← UPDATED
-        border: isDark ? `1px solid rgba(255, 107, 107, 0.3)` : '1px solid #fecaca',  // ← UPDATED
-        borderRadius: '10px',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: 'bold',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        transition: 'all 0.3s'
-    }}
-    onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 107, 107, 0.2)';
-    }}
-    onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = 'none';
-    }}
-    >
-        <HiOutlineDocumentText /> Gérer les offres
-    </button>
-</Link>
+                    <Link to="/dashboard/offres" style={{ textDecoration: 'none' }}>
+                        <button style={{
+                            padding: '12px 24px',
+                            background: isDark ? `rgba(255, 107, 107, 0.2)` : '#fef2f2',
+                            color: '#ff6b6b',
+                            border: isDark ? `1px solid rgba(255, 107, 107, 0.3)` : '1px solid #fecaca',
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transition: 'all 0.3s'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 107, 107, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                        >
+                            <HiOutlineDocumentText /> Gérer les offres
+                        </button>
+                    </Link>
                 </div>
             </div>
 
-            {/* Message Toast - Using File Version Style */}
+            {/* Message Toast */}
             {message && (
                 <div 
                     onClick={() => setMessage("")}
@@ -1010,294 +976,289 @@ function Candidats() {
                 </div>
             )}
 
-            {/* Stats Cards - With Tab-specific stats */}
-            {/* Stats Cards - Redesigné comme la deuxième image */}
-<div style={{ 
-    display: 'grid', 
-    gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', 
-    gap: '16px', 
-    marginBottom: '25px' 
-}}>
-    {/* Total */}
-    <div style={{
-        background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
-        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-        borderRadius: '16px',
-        padding: '18px 22px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        transition: 'all 0.3s ease',
-        cursor: 'pointer'
-    }}
-    onMouseEnter={(e) => { 
-        e.currentTarget.style.transform = 'translateY(-4px)'; 
-        e.currentTarget.style.borderColor = roleColor;
-        e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
-    }}
-    onMouseLeave={(e) => { 
-        e.currentTarget.style.transform = 'translateY(0)'; 
-        e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
-        e.currentTarget.style.boxShadow = 'none';
-    }}>
-        <div style={{
-            width: '46px',
-            height: '46px',
-            minWidth: '46px',
-            borderRadius: '12px',
-            background: `${roleColor}20`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: roleColor,
-            fontSize: '20px'
-        }}>
-            <FiFileText size={20} />
-        </div>
-        <div>
+            {/* Stats Cards */}
             <div style={{ 
-                fontSize: '26px', 
-                fontWeight: '700', 
-                color: isDark ? '#fefae0' : '#0f172a',
-                fontFamily: "'Quicksand', sans-serif",
-                lineHeight: 1.2
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', 
+                gap: '16px', 
+                marginBottom: '25px' 
             }}>
-                {stats.total}
-            </div>
-            <div style={{ 
-                color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
-                fontSize: '13px',
-                fontWeight: '500'
-            }}>
-                Total
-            </div>
-        </div>
-    </div>
+                <div style={{
+                    background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
+                    border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '18px 22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(-4px)'; 
+                    e.currentTarget.style.borderColor = roleColor;
+                    e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
+                }}
+                onMouseLeave={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(0)'; 
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                }}>
+                    <div style={{
+                        width: '46px',
+                        height: '46px',
+                        minWidth: '46px',
+                        borderRadius: '12px',
+                        background: `${roleColor}20`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: roleColor,
+                        fontSize: '20px'
+                    }}>
+                        <FiFileText size={20} />
+                    </div>
+                    <div>
+                        <div style={{ 
+                            fontSize: '26px', 
+                            fontWeight: '700', 
+                            color: isDark ? '#fefae0' : '#0f172a',
+                            fontFamily: "'Quicksand', sans-serif",
+                            lineHeight: 1.2
+                        }}>
+                            {stats.total}
+                        </div>
+                        <div style={{ 
+                            color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
+                            fontSize: '13px',
+                            fontWeight: '500'
+                        }}>
+                            Total
+                        </div>
+                    </div>
+                </div>
 
-    {/* En attente */}
-    <div style={{
-        background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
-        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-        borderRadius: '16px',
-        padding: '18px 22px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        transition: 'all 0.3s ease',
-        cursor: 'pointer'
-    }}
-    onMouseEnter={(e) => { 
-        e.currentTarget.style.transform = 'translateY(-4px)'; 
-        e.currentTarget.style.borderColor = '#f59e0b';
-        e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
-    }}
-    onMouseLeave={(e) => { 
-        e.currentTarget.style.transform = 'translateY(0)'; 
-        e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
-        e.currentTarget.style.boxShadow = 'none';
-    }}>
-        <div style={{
-            width: '46px',
-            height: '46px',
-            minWidth: '46px',
-            borderRadius: '12px',
-            background: 'rgba(245, 158, 11, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#f59e0b',
-            fontSize: '20px'
-        }}>
-            <FiClock size={20} />
-        </div>
-        <div>
-            <div style={{ 
-                fontSize: '26px', 
-                fontWeight: '700', 
-                color: isDark ? '#fefae0' : '#0f172a',
-                fontFamily: "'Quicksand', sans-serif",
-                lineHeight: 1.2
-            }}>
-                {stats.enAttente}
-            </div>
-            <div style={{ 
-                color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
-                fontSize: '13px',
-                fontWeight: '500'
-            }}>
-                En attente
-            </div>
-        </div>
-    </div>
+                <div style={{
+                    background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
+                    border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '18px 22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(-4px)'; 
+                    e.currentTarget.style.borderColor = '#f59e0b';
+                    e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
+                }}
+                onMouseLeave={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(0)'; 
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                }}>
+                    <div style={{
+                        width: '46px',
+                        height: '46px',
+                        minWidth: '46px',
+                        borderRadius: '12px',
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#f59e0b',
+                        fontSize: '20px'
+                    }}>
+                        <FiClock size={20} />
+                    </div>
+                    <div>
+                        <div style={{ 
+                            fontSize: '26px', 
+                            fontWeight: '700', 
+                            color: isDark ? '#fefae0' : '#0f172a',
+                            fontFamily: "'Quicksand', sans-serif",
+                            lineHeight: 1.2
+                        }}>
+                            {stats.enAttente}
+                        </div>
+                        <div style={{ 
+                            color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
+                            fontSize: '13px',
+                            fontWeight: '500'
+                        }}>
+                            En attente
+                        </div>
+                    </div>
+                </div>
 
-    {/* Acceptées */}
-    <div style={{
-        background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
-        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-        borderRadius: '16px',
-        padding: '18px 22px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        transition: 'all 0.3s ease',
-        cursor: 'pointer'
-    }}
-    onMouseEnter={(e) => { 
-        e.currentTarget.style.transform = 'translateY(-4px)'; 
-        e.currentTarget.style.borderColor = '#10b981';
-        e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
-    }}
-    onMouseLeave={(e) => { 
-        e.currentTarget.style.transform = 'translateY(0)'; 
-        e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
-        e.currentTarget.style.boxShadow = 'none';
-    }}>
-        <div style={{
-            width: '46px',
-            height: '46px',
-            minWidth: '46px',
-            borderRadius: '12px',
-            background: 'rgba(16, 185, 129, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#10b981',
-            fontSize: '20px'
-        }}>
-            <FiCheckCircle size={20} />
-        </div>
-        <div>
-            <div style={{ 
-                fontSize: '26px', 
-                fontWeight: '700', 
-                color: isDark ? '#fefae0' : '#0f172a',
-                fontFamily: "'Quicksand', sans-serif",
-                lineHeight: 1.2
-            }}>
-                {stats.acceptees}
-            </div>
-            <div style={{ 
-                color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
-                fontSize: '13px',
-                fontWeight: '500'
-            }}>
-                Acceptées
-            </div>
-        </div>
-    </div>
+                <div style={{
+                    background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
+                    border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '18px 22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(-4px)'; 
+                    e.currentTarget.style.borderColor = '#10b981';
+                    e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
+                }}
+                onMouseLeave={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(0)'; 
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                }}>
+                    <div style={{
+                        width: '46px',
+                        height: '46px',
+                        minWidth: '46px',
+                        borderRadius: '12px',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#10b981',
+                        fontSize: '20px'
+                    }}>
+                        <FiCheckCircle size={20} />
+                    </div>
+                    <div>
+                        <div style={{ 
+                            fontSize: '26px', 
+                            fontWeight: '700', 
+                            color: isDark ? '#fefae0' : '#0f172a',
+                            fontFamily: "'Quicksand', sans-serif",
+                            lineHeight: 1.2
+                        }}>
+                            {stats.acceptees}
+                        </div>
+                        <div style={{ 
+                            color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
+                            fontSize: '13px',
+                            fontWeight: '500'
+                        }}>
+                            Acceptées
+                        </div>
+                    </div>
+                </div>
 
-    {/* Refusées */}
-    <div style={{
-        background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
-        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-        borderRadius: '16px',
-        padding: '18px 22px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        transition: 'all 0.3s ease',
-        cursor: 'pointer'
-    }}
-    onMouseEnter={(e) => { 
-        e.currentTarget.style.transform = 'translateY(-4px)'; 
-        e.currentTarget.style.borderColor = '#ef4444';
-        e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
-    }}
-    onMouseLeave={(e) => { 
-        e.currentTarget.style.transform = 'translateY(0)'; 
-        e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
-        e.currentTarget.style.boxShadow = 'none';
-    }}>
-        <div style={{
-            width: '46px',
-            height: '46px',
-            minWidth: '46px',
-            borderRadius: '12px',
-            background: 'rgba(239, 68, 68, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#ef4444',
-            fontSize: '20px'
-        }}>
-            <FiXCircle size={20} />
-        </div>
-        <div>
-            <div style={{ 
-                fontSize: '26px', 
-                fontWeight: '700', 
-                color: isDark ? '#fefae0' : '#0f172a',
-                fontFamily: "'Quicksand', sans-serif",
-                lineHeight: 1.2
-            }}>
-                {stats.refusees}
-            </div>
-            <div style={{ 
-                color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
-                fontSize: '13px',
-                fontWeight: '500'
-            }}>
-                Refusées
-            </div>
-        </div>
-    </div>
+                <div style={{
+                    background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
+                    border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '18px 22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(-4px)'; 
+                    e.currentTarget.style.borderColor = '#ef4444';
+                    e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
+                }}
+                onMouseLeave={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(0)'; 
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                }}>
+                    <div style={{
+                        width: '46px',
+                        height: '46px',
+                        minWidth: '46px',
+                        borderRadius: '12px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ef4444',
+                        fontSize: '20px'
+                    }}>
+                        <FiXCircle size={20} />
+                    </div>
+                    <div>
+                        <div style={{ 
+                            fontSize: '26px', 
+                            fontWeight: '700', 
+                            color: isDark ? '#fefae0' : '#0f172a',
+                            fontFamily: "'Quicksand', sans-serif",
+                            lineHeight: 1.2
+                        }}>
+                            {stats.refusees}
+                        </div>
+                        <div style={{ 
+                            color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
+                            fontSize: '13px',
+                            fontWeight: '500'
+                        }}>
+                            Refusées
+                        </div>
+                    </div>
+                </div>
 
-    {/* Avec CV */}
-    <div style={{
-        background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
-        border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-        borderRadius: '16px',
-        padding: '18px 22px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        transition: 'all 0.3s ease',
-        cursor: 'pointer'
-    }}
-    onMouseEnter={(e) => { 
-        e.currentTarget.style.transform = 'translateY(-4px)'; 
-        e.currentTarget.style.borderColor = '#8b5cf6';
-        e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
-    }}
-    onMouseLeave={(e) => { 
-        e.currentTarget.style.transform = 'translateY(0)'; 
-        e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
-        e.currentTarget.style.boxShadow = 'none';
-    }}>
-        <div style={{
-            width: '46px',
-            height: '46px',
-            minWidth: '46px',
-            borderRadius: '12px',
-            background: 'rgba(139, 92, 246, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#8b5cf6',
-            fontSize: '20px'
-        }}>
-            <HiOutlineDocumentText size={20} />
-        </div>
-        <div>
-            <div style={{ 
-                fontSize: '26px', 
-                fontWeight: '700', 
-                color: isDark ? '#fefae0' : '#0f172a',
-                fontFamily: "'Quicksand', sans-serif",
-                lineHeight: 1.2
-            }}>
-                {stats.avecCV}
+                <div style={{
+                    background: isDark ? 'rgba(255,255,255,0.06)' : '#ffffff',
+                    border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
+                    borderRadius: '16px',
+                    padding: '18px 22px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(-4px)'; 
+                    e.currentTarget.style.borderColor = '#8b5cf6';
+                    e.currentTarget.style.boxShadow = isDark ? '0 8px 25px rgba(0,0,0,0.2)' : '0 8px 25px rgba(0,0,0,0.08)';
+                }}
+                onMouseLeave={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(0)'; 
+                    e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0';
+                    e.currentTarget.style.boxShadow = 'none';
+                }}>
+                    <div style={{
+                        width: '46px',
+                        height: '46px',
+                        minWidth: '46px',
+                        borderRadius: '12px',
+                        background: 'rgba(139, 92, 246, 0.15)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#8b5cf6',
+                        fontSize: '20px'
+                    }}>
+                        <HiOutlineDocumentText size={20} />
+                    </div>
+                    <div>
+                        <div style={{ 
+                            fontSize: '26px', 
+                            fontWeight: '700', 
+                            color: isDark ? '#fefae0' : '#0f172a',
+                            fontFamily: "'Quicksand', sans-serif",
+                            lineHeight: 1.2
+                        }}>
+                            {stats.avecCV}
+                        </div>
+                        <div style={{ 
+                            color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
+                            fontSize: '13px',
+                            fontWeight: '500'
+                        }}>
+                            Avec CV
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style={{ 
-                color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
-                fontSize: '13px',
-                fontWeight: '500'
-            }}>
-                Avec CV
-            </div>
-        </div>
-    </div>
-</div>
+
             {/* Onglets */}
             <div style={{ 
                 display: 'flex', 
@@ -1565,7 +1526,6 @@ function Candidats() {
                                             <span style={{ color: isDark ? 'rgba(254,250,224,0.4)' : '#94a3b8', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <FiCalendar size={12} /> {formatDate(candidature.dateCandidature)}
                                             </span>
-                                            {/* Interview stage indicator */}
                                             {candidature.interviewType === 'reel' && (
                                                 <span style={{ 
                                                     background: candidature.etapeEntretien === 'visio_en_cours' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
@@ -1590,28 +1550,23 @@ function Candidats() {
                                     {renderStatut(candidature.statut)}
                                     
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                        {/* Actions pendant la Visio */}
-                                        {candidature.interviewType === 'reel' && candidature.etapeEntretien === 'visio_en_cours' && (
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                {candidature.lienVisio ? (
-                                                    <button onClick={(e) => { e.stopPropagation(); window.open(candidature.lienVisio, '_blank'); }}
-                                                        style={{ padding: '8px 14px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', animation: 'pulse 2s infinite' }}>
-                                                        <FiVideo size={12} /> Rejoindre
-                                                    </button>
-                                                ) : (
-                                                    <button style={{ padding: '8px 14px', background: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fffbeb', color: '#f59e0b', border: isDark ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-                                                        <FiRefreshCw size={12} /> Générer lien
-                                                    </button>
-                                                )}
-                                                
-                                                <button onClick={(e) => { e.stopPropagation(); handleTerminerEntretienReel(candidature.offreId, candidature._id); }}
-                                                    style={{ padding: '8px 14px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                    <FiXCircle size={12} /> Terminer la visio
-                                                </button>
-                                            </div>
-                                        )}
+                                        {/* Actions pendant la Visio - Recruiter can only join */}
+{candidature.interviewType === 'reel' && candidature.etapeEntretien === 'visio_en_cours' && (
+    <div style={{ display: 'flex', gap: '8px' }}>
+        {candidature.lienVisio ? (
+            <button onClick={(e) => { e.stopPropagation(); window.open(candidature.lienVisio, '_blank'); }}
+                style={{ padding: '8px 14px', background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', animation: 'pulse 2s infinite' }}>
+                <FiVideo size={12} /> Rejoindre
+            </button>
+        ) : (
+            <button style={{ padding: '8px 14px', background: isDark ? 'rgba(245, 158, 11, 0.2)' : '#fffbeb', color: '#f59e0b', border: isDark ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid #fde68a', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                <FiRefreshCw size={12} /> Générer lien
+            </button>
+        )}
+    </div>
+)}
 
-                                        {/* Actions APRÈS la Visio (Décision Finale) */}
+                                        {/* Actions APRÈS la Visio */}
                                         {candidature.interviewType === 'reel' && candidature.etapeEntretien === 'termine' && candidature.statut === 'acceptée' && (
                                             <div style={{ display: 'flex', gap: '8px' }}>
                                                 <button onClick={(e) => { e.stopPropagation(); handleStatusChange(candidature.offreId, candidature._id, 'embauché'); }}
@@ -1647,15 +1602,25 @@ function Candidats() {
                                             <FiEye size={12} /> Détails
                                         </button>
                                         
-                                        {/* Télécharger CV */}
+                                        {/* Télécharger CV - FIXED with UNIQUE key */}
                                         <button 
-                                            onClick={() => handleDownloadCV(candidature.etudiantId?._id || candidature.etudiantId, `${candidature.etudiantInfo?.prenom || ''} ${candidature.etudiantInfo?.nom || ''}`)}
-                                            disabled={cvLoading[candidature.etudiantId?._id || candidature.etudiantId]}
+                                            onClick={() => {
+                                                const etudiantId = candidature.etudiantId?._id || candidature.etudiantId;
+                                                const etudiantName = `${candidature.etudiantInfo?.prenom || ''} ${candidature.etudiantInfo?.nom || ''}`.trim() || 'Étudiant';
+                                                handleDownloadCV(etudiantId, etudiantName, candidature._id);
+                                            }}
+                                            disabled={cvLoading[`${candidature._id}-${candidature.etudiantId?._id || candidature.etudiantId}`]}
                                             style={{ 
                                                 padding: '8px 14px', 
-                                                background: candidature.etudiantInfo?.cv?.filename ? 'rgba(40,167,69,0.2)' : 'transparent', 
-                                                color: candidature.etudiantInfo?.cv?.filename ? '#28a745' : (isDark ? 'rgba(254,250,224,0.3)' : '#94a3b8'), 
-                                                border: candidature.etudiantInfo?.cv?.filename ? '1px solid rgba(40,167,69,0.3)' : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0'), 
+                                                background: candidature.etudiantInfo?.cv?.filename 
+                                                    ? 'rgba(40,167,69,0.2)' 
+                                                    : 'transparent', 
+                                                color: candidature.etudiantInfo?.cv?.filename 
+                                                    ? '#28a745' 
+                                                    : (isDark ? 'rgba(254,250,224,0.3)' : '#94a3b8'), 
+                                                border: candidature.etudiantInfo?.cv?.filename 
+                                                    ? '1px solid rgba(40,167,69,0.3)' 
+                                                    : (isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0'), 
                                                 borderRadius: '8px', 
                                                 cursor: candidature.etudiantInfo?.cv?.filename ? 'pointer' : 'not-allowed', 
                                                 fontSize: '12px',
@@ -1675,12 +1640,14 @@ function Candidats() {
                                                 }
                                             }}
                                         >
-                                            {cvLoading[candidature.etudiantId?._id || candidature.etudiantId] ? 
-                                                <FiClock size={12} /> : <FiDownload size={12} />
-                                            } CV
+                                            {cvLoading[`${candidature._id}-${candidature.etudiantId?._id || candidature.etudiantId}`] ? (
+                                                <FiClock size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                                            ) : (
+                                                <FiDownload size={12} />
+                                            )} CV
                                         </button>
                                         
-                                        {/* Accepter (pour les en attente) */}
+                                        {/* Accepter */}
                                         {candidature.statut === 'en attente' && (
                                             <>
                                                 <button
@@ -1764,7 +1731,7 @@ function Candidats() {
                 </div>
             )}
 
-            {/* Modal de détails - Using File Version Style */}
+            {/* Modal de détails */}
             {showDetailModal && selectedCandidature && (
                 <ModalPortal>
                     <div style={{ 
@@ -1910,38 +1877,50 @@ function Candidats() {
                                             {renderStatut(selectedCandidature.statut)}
                                         </div>
                                     </div>
-                                    {/* CV Download Button in Detail Modal */}
                                     <div>
+                                        {/* CV Download Button in Detail Modal - FIXED with UNIQUE key */}
                                         <button
                                             onClick={() => {
                                                 const etudiantId = selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId;
                                                 const nom = `${selectedCandidature.etudiantInfo?.prenom || ''} ${selectedCandidature.etudiantInfo?.nom || ''}`.trim() || 'Étudiant';
-                                                handleDownloadCV(etudiantId, nom);
+                                                handleDownloadCV(etudiantId, nom, selectedCandidature._id);
                                             }}
-                                            disabled={cvLoading[selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId]}
+                                            disabled={cvLoading[`${selectedCandidature._id}-${selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId}`]}
                                             style={{
                                                 padding: '12px 20px',
                                                 background: 'linear-gradient(135deg, #6c63ff, #4834d4)',
                                                 color: 'white',
                                                 border: 'none',
                                                 borderRadius: '10px',
-                                                cursor: cvLoading[selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId] ? 'not-allowed' : 'pointer',
+                                                cursor: cvLoading[`${selectedCandidature._id}-${selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId}`] 
+                                                    ? 'not-allowed' 
+                                                    : 'pointer',
                                                 fontSize: '14px',
                                                 fontWeight: 'bold',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '8px',
-                                                opacity: cvLoading[selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId] ? 0.7 : 1,
+                                                opacity: cvLoading[`${selectedCandidature._id}-${selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId}`] 
+                                                    ? 0.7 
+                                                    : 1,
                                                 boxShadow: '0 4px 15px rgba(108, 99, 255, 0.3)',
                                                 transition: 'all 0.3s'
                                             }}
-                                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                            onMouseEnter={(e) => {
+                                                if (!cvLoading[`${selectedCandidature._id}-${selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId}`]) {
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                }
+                                            }}
                                             onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                                         >
-                                            {cvLoading[selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId] ? 
-                                                <FiClock size={16} /> : <FiDownload size={16} />
-                                            }
-                                            {cvLoading[selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId] ? 'Chargement...' : 'Télécharger CV'}
+                                            {cvLoading[`${selectedCandidature._id}-${selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId}`] ? (
+                                                <FiClock size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                                            ) : (
+                                                <FiDownload size={16} />
+                                            )}
+                                            {cvLoading[`${selectedCandidature._id}-${selectedCandidature.etudiantId?._id || selectedCandidature.etudiantId}`] 
+                                                ? 'Chargement...' 
+                                                : 'Télécharger CV'}
                                         </button>
                                     </div>
                                 </div>
@@ -2171,7 +2150,7 @@ function Candidats() {
                 </ModalPortal>
             )}
 
-            {/* Modal de déploiement - Using File Version Style */}
+            {/* Modal de déploiement */}
             {showDeployModal && (
                 <ModalPortal>
                     <div style={{ 
@@ -2212,10 +2191,7 @@ function Candidats() {
                                 alignItems: 'center' 
                             }}>
                                 <h2 style={{ color: isDark ? '#fefae0' : '#0f172a', fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    {deployAction === 'accept_all_ai' ? 
-                                        <><FiCpu style={{ color: roleColor }} /> Accepter et Déployer</> : 
-                                        <><FiSearch style={{ color: '#f59e0b' }} /> Analyser et Déployer</>
-                                    }
+                                    <FiZap style={{ color: roleColor }} /> Traiter toutes les candidatures
                                 </h2>
                                 <button 
                                     onClick={() => setShowDeployModal(false)} 
@@ -2236,7 +2212,10 @@ function Candidats() {
                             
                             <div style={{ padding: '30px' }}>
                                 <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b', marginBottom: '25px', lineHeight: '1.6', fontSize: '15px' }}>
-                                    Vous allez traiter <strong style={{ color: roleColor }}>{deployData?.count || 0}</strong> candidature(s) {deployData?.type === 'automatiques' ? 'automatique(s)' : 'manuelle(s)'}.
+                                    Vous allez traiter <strong style={{ color: roleColor }}>{deployData?.count || 0}</strong> 
+                                    candidature(s) en attente (
+                                    {candidatures.filter(c => c.statut === 'en attente' && c.typeCandidature === 'automatique').length} IA, 
+                                    {candidatures.filter(c => c.statut === 'en attente' && c.typeCandidature !== 'automatique').length} manuelles).
                                 </p>
                                 
                                 <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b', marginBottom: '25px', fontSize: '15px', fontWeight: '500' }}>
@@ -2247,19 +2226,18 @@ function Candidats() {
                                     <button
                                         onClick={() => {
                                             setShowDeployModal(false);
-                                            if (deployAction === 'accept_all_ai') { handleAcceptAllAI(true); }
-                                            else if (deployAction === 'analyse_manual') { handleAutoProcessManuel(true); }
+                                            handleProcessAll(true);
                                         }}
-                                        style={{ 
-                                            padding: '18px', 
-                                            background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`, 
-                                            color: 'white', 
-                                            border: '2px solid rgba(108, 99, 255, 0.5)', 
-                                            borderRadius: '14px', 
-                                            cursor: 'pointer', 
-                                            fontSize: '16px', 
-                                            fontWeight: 'bold', 
-                                            textAlign: 'left', 
+                                        style={{
+                                            padding: '18px',
+                                            background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
+                                            color: 'white',
+                                            border: '2px solid rgba(108, 99, 255, 0.5)',
+                                            borderRadius: '14px',
+                                            cursor: 'pointer',
+                                            fontSize: '16px',
+                                            fontWeight: 'bold',
+                                            textAlign: 'left',
                                             transition: 'all 0.3s',
                                             boxShadow: `0 4px 16px ${roleColor}40`
                                         }}
@@ -2276,19 +2254,18 @@ function Candidats() {
                                     <button
                                         onClick={() => {
                                             setShowDeployModal(false);
-                                            if (deployAction === 'accept_all_ai') { handleAcceptAllAI(false); }
-                                            else if (deployAction === 'analyse_manual') { handleAutoProcessManuel(false); }
+                                            handleProcessAll(false);
                                         }}
-                                        style={{ 
-                                            padding: '18px', 
-                                            background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#f0fdf4', 
-                                            color: '#10b981', 
-                                            border: isDark ? '2px solid rgba(16, 185, 129, 0.3)' : '2px solid #bbf7d0', 
-                                            borderRadius: '14px', 
-                                            cursor: 'pointer', 
-                                            fontSize: '16px', 
-                                            fontWeight: 'bold', 
-                                            textAlign: 'left', 
+                                        style={{
+                                            padding: '18px',
+                                            background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#f0fdf4',
+                                            color: '#10b981',
+                                            border: isDark ? '2px solid rgba(16, 185, 129, 0.3)' : '2px solid #bbf7d0',
+                                            borderRadius: '14px',
+                                            cursor: 'pointer',
+                                            fontSize: '16px',
+                                            fontWeight: 'bold',
+                                            textAlign: 'left',
                                             transition: 'all 0.3s'
                                         }}
                                         onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
@@ -2304,16 +2281,16 @@ function Candidats() {
                                 
                                 <button 
                                     onClick={() => setShowDeployModal(false)}
-                                    style={{ 
-                                        width: '100%', 
-                                        padding: '14px', 
-                                        marginTop: '20px', 
-                                        background: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9', 
-                                        color: isDark ? 'rgba(255,255,255,0.7)' : '#475569', 
-                                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #cbd5e1', 
-                                        borderRadius: '10px', 
-                                        cursor: 'pointer', 
-                                        fontSize: '14px' 
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px',
+                                        marginTop: '20px',
+                                        background: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
+                                        color: isDark ? 'rgba(255,255,255,0.7)' : '#475569',
+                                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #cbd5e1',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
                                     }}
                                 >
                                     Annuler
@@ -2324,7 +2301,7 @@ function Candidats() {
                 </ModalPortal>
             )}
 
-            {/* Modale Acceptation Individuelle - Using File Version Style */}
+            {/* Modale Acceptation Individuelle */}
             {showSingleDeployModal && singleDeployCandidature && (
                 <ModalPortal>
                     <div style={{ 
@@ -2411,7 +2388,7 @@ function Candidats() {
                                                 singleDeployCandidature.offreId, 
                                                 singleDeployCandidature._id, 
                                                 'acceptée',
-                                                "✅ Acceptée - Entretien AI déployé"
+                                                "Acceptée - Entretien AI déployé"
                                             );
                                             await deployerInterviewAI(
                                                 singleDeployCandidature._id, 
@@ -2421,16 +2398,16 @@ function Candidats() {
                                             setSingleDeployCandidature(null);
                                             fetchRecruiterData(user.id);
                                         }}
-                                        style={{ 
-                                            padding: '16px', 
-                                            background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`, 
-                                            color: 'white', 
-                                            border: 'none', 
-                                            borderRadius: '12px', 
-                                            cursor: 'pointer', 
-                                            fontSize: '15px', 
-                                            fontWeight: 'bold', 
-                                            textAlign: 'left', 
+                                        style={{
+                                            padding: '16px',
+                                            background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '12px',
+                                            cursor: 'pointer',
+                                            fontSize: '15px',
+                                            fontWeight: 'bold',
+                                            textAlign: 'left',
                                             transition: 'all 0.3s',
                                             boxShadow: `0 4px 16px ${roleColor}40`
                                         }}
@@ -2457,16 +2434,16 @@ function Candidats() {
                                             setShowRecruiterCalendarModal(true);
                                             setSingleDeployCandidature(null);
                                         }}
-                                        style={{ 
-                                            padding: '16px', 
-                                            background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#f0fdf4', 
-                                            color: '#10b981', 
-                                            border: isDark ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #bbf7d0', 
-                                            borderRadius: '12px', 
-                                            cursor: 'pointer', 
-                                            fontSize: '15px', 
-                                            fontWeight: 'bold', 
-                                            textAlign: 'left', 
+                                        style={{
+                                            padding: '16px',
+                                            background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#f0fdf4',
+                                            color: '#10b981',
+                                            border: isDark ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #bbf7d0',
+                                            borderRadius: '12px',
+                                            cursor: 'pointer',
+                                            fontSize: '15px',
+                                            fontWeight: 'bold',
+                                            textAlign: 'left',
                                             transition: 'all 0.3s' 
                                         }}
                                         onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
@@ -2482,15 +2459,15 @@ function Candidats() {
                                 
                                 <button 
                                     onClick={() => { setShowSingleDeployModal(false); setSingleDeployCandidature(null); }}
-                                    style={{ 
-                                        width: '100%', 
-                                        padding: '12px', 
-                                        background: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9', 
-                                        color: isDark ? 'rgba(255,255,255,0.7)' : '#475569', 
-                                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #cbd5e1', 
-                                        borderRadius: '10px', 
-                                        cursor: 'pointer', 
-                                        fontSize: '14px' 
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        background: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
+                                        color: isDark ? 'rgba(255,255,255,0.7)' : '#475569',
+                                        border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #cbd5e1',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
                                     }}
                                 >
                                     Annuler
@@ -2531,13 +2508,13 @@ function Candidats() {
                                     })
                                 });
                                 if (!acceptRes.ok) {
-                                    setMessage('❌ Erreur lors de l\'acceptation');
+                                    setMessage('Erreur lors de l\'acceptation');
                                     setSelectedCandidatureForCreneau(null);
                                     return;
                                 }
                             } catch (err) {
                                 console.error('Error accepting:', err);
-                                setMessage('❌ Erreur lors de l\'acceptation');
+                                setMessage('Erreur lors de l\'acceptation');
                                 setSelectedCandidatureForCreneau(null);
                                 return;
                             }
@@ -2551,7 +2528,7 @@ function Candidats() {
                                     heureFin: creneau.heureFin
                                 }
                             );
-                            setMessage(`✅ Entretien réel planifié avec succès pour le ${creneau.date} à ${creneau.heureDebut}`);
+                            setMessage("Entretien réel planifié avec succès pour le " + creneau.date + " à " + creneau.heureDebut);
                             setTimeout(() => setMessage(''), 5000);
                             fetchRecruiterData(user.id);
                             setSelectedCandidatureForCreneau(null);
@@ -2561,7 +2538,7 @@ function Candidats() {
                 </ModalPortal>
             )}
 
-            {/* Confirmation Modal - Using File Version Style */}
+            {/* Confirmation Modal */}
             {customConfirm.show && (
                 <ModalPortal>
                     <div 
@@ -2648,7 +2625,7 @@ function Candidats() {
                 </ModalPortal>
             )}
 
-            {/* Auto-Process Results Modal - Using File Version Style */}
+            {/* Auto-Process Results Modal */}
             {showAutoProcessModal && !isAutoProcessing && autoProcessResults && (
                 <ModalPortal>
                     <div style={{ 
@@ -2699,7 +2676,7 @@ function Candidats() {
                                 zIndex: 1
                             }}>
                                 <h2 style={{ color: isDark ? '#fefae0' : '#0f172a', fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <FiBarChart2 style={{ color: '#f59e0b' }} /> Résultats de l'analyse automatique
+                                    <FiBarChart2 style={{ color: '#f59e0b' }} /> Résultats du traitement
                                 </h2>
                                 <button 
                                     onClick={() => { setShowAutoProcessModal(false); setAutoProcessResults(null); }} 
@@ -2786,6 +2763,19 @@ function Candidats() {
                                             <div>
                                                 <span style={{ color: isDark ? '#fefae0' : '#0f172a', fontSize: '14px', fontWeight: '500' }}>{detail.nom}</span>
                                                 <span style={{ color: isDark ? 'rgba(254,250,224,0.4)' : '#94a3b8', fontSize: '12px', marginLeft: '10px' }}>{detail.offre}</span>
+                                                {detail.type && (
+                                                    <span style={{
+                                                        marginLeft: '8px',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '10px',
+                                                        fontWeight: '500',
+                                                        background: detail.type === 'automatique' ? 'rgba(108, 99, 255, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                                        color: detail.type === 'automatique' ? '#6c63ff' : '#f59e0b'
+                                                    }}>
+                                                        {detail.type === 'automatique' ? 'IA' : 'Manuelle'}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 {detail.match > 0 && (
@@ -2822,17 +2812,17 @@ function Candidats() {
 
                                 <button 
                                     onClick={() => { setShowAutoProcessModal(false); setAutoProcessResults(null); }}
-                                    style={{ 
-                                        width: '100%', 
-                                        padding: '14px', 
-                                        marginTop: '20px', 
-                                        background: 'linear-gradient(135deg, #6c63ff, #4834d4)', 
-                                        color: 'white', 
-                                        border: 'none', 
-                                        borderRadius: '10px', 
-                                        cursor: 'pointer', 
-                                        fontSize: '14px', 
-                                        fontWeight: 'bold' 
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px',
+                                        marginTop: '20px',
+                                        background: 'linear-gradient(135deg, #6c63ff, #4834d4)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                        fontWeight: 'bold'
                                     }}
                                 >
                                     <FiCheckCircle size={16} style={{ display: 'inline', marginRight: '8px' }} /> Fermer
@@ -2843,7 +2833,7 @@ function Candidats() {
                 </ModalPortal>
             )}
 
-            {/* Auto-Process Progress Modal - Using File Version Style */}
+            {/* Auto-Process Progress Modal */}
             {showAutoProcessModal && isAutoProcessing && (
                 <ModalPortal>
                     <div style={{ 
@@ -2876,10 +2866,10 @@ function Candidats() {
                                 <FiSearch size={50} style={{ color: '#f59e0b' }} />
                             </div>
                             <h2 style={{ color: isDark ? '#fefae0' : '#0f172a', fontSize: '22px', marginBottom: '10px' }}>
-                                Analyse en cours...
+                                Traitement en cours...
                             </h2>
                             <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b', fontSize: '14px', marginBottom: '25px' }}>
-                                Analyse des CV et traitement des candidatures manuelles
+                                Analyse des CV et traitement des candidatures
                             </p>
                             <div style={{ 
                                 width: '100%', 
@@ -2898,138 +2888,6 @@ function Candidats() {
                                 }} />
                             </div>
                             <p style={{ color: '#f59e0b', fontSize: '14px', fontWeight: 'bold' }}>{autoProcessProgress}%</p>
-                        </div>
-                    </div>
-                </ModalPortal>
-            )}
-
-            {/* Accept All Modal - Using File Version Style */}
-            {showAcceptAllModal && (
-                <ModalPortal>
-                    <div style={{ 
-                        position: 'fixed', 
-                        top: 0, 
-                        left: 0, 
-                        right: 0, 
-                        bottom: 0, 
-                        width: '100vw',
-                        height: '100vh',
-                        background: 'rgba(0,0,0,0.85)', 
-                        backdropFilter: 'blur(8px)', 
-                        display: 'flex', 
-                        justifyContent: 'center', 
-                        alignItems: 'center', 
-                        zIndex: 2000, 
-                        padding: '20px' 
-                    }}
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setShowAcceptAllModal(false);
-                    }}
-                    >
-                        <div style={{ 
-                            background: isDark ? 'linear-gradient(135deg, #1e1e3f, #2c2c54)' : '#ffffff', 
-                            border: isDark ? '1px solid rgba(108, 99, 255, 0.3)' : '1px solid #ddd6fe', 
-                            borderRadius: '20px', 
-                            width: '100%', 
-                            maxWidth: '500px', 
-                            boxShadow: isDark ? '0 25px 50px rgba(0,0,0,0.5)' : '0 25px 50px rgba(0,0,0,0.1)' 
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        >
-                            <div style={{ 
-                                padding: '25px 30px', 
-                                borderBottom: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0', 
-                                display: 'flex', 
-                                justifyContent: 'space-between', 
-                                alignItems: 'center' 
-                            }}>
-                                <h2 style={{ color: isDark ? '#fefae0' : '#0f172a', fontSize: '20px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <FiCpu style={{ color: roleColor }} /> Accepter toutes les candidatures AI
-                                </h2>
-                                <button 
-                                    onClick={() => setShowAcceptAllModal(false)} 
-                                    style={{ 
-                                        background: isDark ? 'rgba(255,255,255,0.1)' : '#f1f5f9', 
-                                        border: 'none', 
-                                        color: isDark ? '#fefae0' : '#0f172a', 
-                                        width: '36px', 
-                                        height: '36px', 
-                                        borderRadius: '50%', 
-                                        cursor: 'pointer', 
-                                        fontSize: '18px' 
-                                    }}
-                                >
-                                    <FiX size={20} />
-                                </button>
-                            </div>
-                            
-                            <div style={{ padding: '30px' }}>
-                                <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b', marginBottom: '20px', lineHeight: '1.6' }}>
-                                    Vous allez accepter <strong style={{ color: roleColor }}>{candidaturesAutomatiques.filter(c => c.statut === 'en attente').length}</strong> candidature(s) automatique(s) en attente.
-                                </p>
-                                
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b', fontSize: '13px', marginBottom: '8px' }}>
-                                        Commentaire (optionnel) :
-                                    </label>
-                                    <textarea 
-                                        value={acceptAllComment} 
-                                        onChange={(e) => setAcceptAllComment(e.target.value)} 
-                                        placeholder="Ajoutez un commentaire pour les étudiants..." 
-                                        rows="3"
-                                        style={{ 
-                                            width: '100%', 
-                                            padding: '12px 15px', 
-                                            borderRadius: '10px', 
-                                            background: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', 
-                                            border: isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid #cbd5e1', 
-                                            color: isDark ? '#fefae0' : '#1e293b', 
-                                            fontSize: '13px', 
-                                            resize: 'vertical', 
-                                            outline: 'none' 
-                                        }}
-                                    />
-                                </div>
-                                
-                                <div style={{ display: 'flex', gap: '12px' }}>
-                                    <button 
-                                        onClick={() => handleAcceptAllAI(true)} 
-                                        disabled={isAcceptingAll}
-                                        style={{ 
-                                            flex: 1, 
-                                            padding: '14px', 
-                                            background: 'linear-gradient(135deg, #10b981, #059669)', 
-                                            color: 'white', 
-                                            border: 'none', 
-                                            borderRadius: '10px', 
-                                            cursor: isAcceptingAll ? 'not-allowed' : 'pointer', 
-                                            fontSize: '14px', 
-                                            fontWeight: 'bold', 
-                                            opacity: isAcceptingAll ? 0.7 : 1,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '8px'
-                                        }}
-                                    >
-                                        {isAcceptingAll ? <><FiClock /> Traitement...</> : <><FiCheckCircle /> Confirmer</>}
-                                    </button>
-                                    <button 
-                                        onClick={() => setShowAcceptAllModal(false)}
-                                        style={{ 
-                                            padding: '14px 20px', 
-                                            background: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9', 
-                                            color: isDark ? 'rgba(255,255,255,0.7)' : '#475569', 
-                                            border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #cbd5e1', 
-                                            borderRadius: '10px', 
-                                            cursor: 'pointer', 
-                                            fontSize: '14px' 
-                                        }}
-                                    >
-                                        Annuler
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </ModalPortal>

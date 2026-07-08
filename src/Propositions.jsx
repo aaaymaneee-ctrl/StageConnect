@@ -1,7 +1,12 @@
-// Propositions.jsx - Design amélioré (aucun changement fonctionnel)
+// Propositions.jsx - Design amélioré avec données complètes
 import { useState, useEffect } from 'react';
 import { useTheme } from './ThemeContext.jsx';
-import { FiMail, FiLock, FiLogIn, FiArrowRight, FiStar, FiAward } from 'react-icons/fi';
+import { 
+  FiAward, FiCheckCircle, FiXCircle, FiClock, FiInbox, 
+  FiBriefcase, FiUser, FiMapPin 
+} from 'react-icons/fi';
+import { HiOutlineOfficeBuilding } from 'react-icons/hi';
+
 function Propositions() {
     const { isDark } = useTheme();
     const [user, setUser] = useState(null);
@@ -11,16 +16,16 @@ function Propositions() {
 
     // Theme Variables
     const textPrimary = isDark ? 'white' : '#0f172a';
-    const textSecondary = isDark ? 'rgba(255,255,255,0.6)' : '#64748b';
-    const textMuted = isDark ? 'rgba(255,255,255,0.35)' : '#94a3b8';
-    const cardBg = isDark ? 'rgba(255,255,255,0.05)' : '#ffffff';
-    const cardBorder = isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0';
+    const textSecondary = isDark ? 'rgba(255, 255, 255, 0.6)' : '#64748b';
+    const textMuted = isDark ? 'rgba(255, 255, 255, 0.35)' : '#94a3b8';
+    const cardBg = isDark ? 'rgba(255, 255, 255, 0.05)' : '#ffffff';
+    const cardBorder = isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #e2e8f0';
 
     // Couleur selon le rôle
     const getRoleColor = () => {
         const role = user?.role;
-        if (role === 'Etudiant') return '#6366f1'; // Bleu pour étudiant
-        if (role === 'Recruteur') return '#f59e0b'; // Orange pour recruteur
+        if (role === 'Etudiant') return '#6366f1';
+        if (role === 'Recruteur') return '#f59e0b';
         return '#6c63ff';
     };
     const roleColor = getRoleColor();
@@ -95,11 +100,28 @@ function Propositions() {
                 const res = await fetch(`https://pfe-backend-five.vercel.app/candidatures/etudiant/${userData.id}`);
                 const data = await res.json();
                 
-                const finalStages = data
-                    .map(c => ({ ...c, statut: c.statutCandidature }))
-                    .filter(c => ['proposition_envoyee', 'embauche_acceptee', 'embauche_refusee'].includes(c.statut))
-                    .sort((a, b) => a.statut === 'proposition_envoyee' ? -1 : 1);
-                    
+                // Deduplicate by offreId using Map
+                const uniqueMap = new Map();
+                
+                data.forEach(c => {
+                    if (['proposition_envoyee', 'embauche_acceptee', 'embauche_refusee'].includes(c.statutCandidature)) {
+                        if (!uniqueMap.has(c.offreId)) {
+                            uniqueMap.set(c.offreId, {
+                                ...c,
+                                statut: c.statutCandidature,
+                                entreprise: c.entreprise || 'Entreprise inconnue'
+                            });
+                        }
+                    }
+                });
+                
+                let finalStages = Array.from(uniqueMap.values());
+                finalStages.sort((a, b) => {
+                    if (a.statut === 'proposition_envoyee' && b.statut !== 'proposition_envoyee') return -1;
+                    if (a.statut !== 'proposition_envoyee' && b.statut === 'proposition_envoyee') return 1;
+                    return 0;
+                });
+                
                 setPropositions(finalStages);
                 
             } else if (userData.role === 'Recruteur') {
@@ -121,12 +143,24 @@ function Propositions() {
                             } catch (e) {
                                 console.error("Could not fetch user", e);
                             }
-                            return { ...c, offreInfo: offre, candidatNom };
+                            return { 
+                                ...c, 
+                                offreInfo: offre, 
+                                candidatNom,
+                                offreTitre: offre.titre,
+                                entreprise: offre.entreprise,
+                                localisation: offre.localisation,
+                                dateCandidature: c.dateCandidature
+                            };
                         })
                 );
                 
                 let finalCandidates = await Promise.all(promises);
-                finalCandidates.sort((a, b) => a.statut === 'proposition_envoyee' ? -1 : 1);
+                finalCandidates.sort((a, b) => {
+                    if (a.statut === 'proposition_envoyee' && b.statut !== 'proposition_envoyee') return -1;
+                    if (a.statut !== 'proposition_envoyee' && b.statut === 'proposition_envoyee') return 1;
+                    return 0;
+                });
                 
                 setPropositions(finalCandidates);
             }
@@ -139,40 +173,52 @@ function Propositions() {
     };
 
     const handleStudentDecision = async (offreId, decision) => {
-        if (!window.confirm(decision === 'embauche_acceptee' ? "Êtes-vous sûr de vouloir accepter ce poste de manière définitive ?" : "Êtes-vous sûr de vouloir décliner cette offre ?")) {
-            return;
-        }
-
+       
         try {
             const res = await fetch(`https://pfe-backend-five.vercel.app/candidatures/${offreId}/${user.id}/decision`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ decision })
             });
+            
             if (res.ok) {
+                // Remove the proposition from the list immediately
+                setPropositions(prevPropositions => 
+                    prevPropositions.filter(prop => prop.offreId !== offreId)
+                );
+                
                 setMessage(decision === 'embauche_acceptee' ? 'Félicitations ! Vous avez accepté le poste.' : 'Vous avez décliné l\'offre avec succès.');
-                fetchPropositions(user);
                 setTimeout(() => setMessage(''), 4000);
+            } else {
+                const data = await res.json();
+                setMessage('❌ ' + (data.error || 'Erreur lors de l\'enregistrement de votre décision.'));
             }
         } catch (err) {
+            console.error("Decision error:", err);
             setMessage('❌ Erreur de connexion au serveur.');
         }
     };
 
-    if (loading) return (
-        <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            height: '50vh', 
-            color: textSecondary 
-        }}>
-            {icons.spinner}
-            <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>Chargement des propositions...</p>
-            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-        </div>
-    );
+    if (loading) {
+        return (
+            <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                minHeight: '100vh',
+                width: '100%',
+                background: isDark ? '#0f172a' : '#f1f5f9',
+                color: textSecondary 
+            }}>
+                {icons.spinner}
+                <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>
+                    Chargement des propositions...
+                </p>
+                <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+            </div>
+        );
+    }
 
     const safeMessageStr = String(message?.props?.children || message);
     const isErrorMessage = safeMessageStr.includes('Erreur') || safeMessageStr.includes('Impossible');
@@ -185,7 +231,7 @@ function Propositions() {
             margin: '0 auto' 
         }}>
             
-            {/* Header Area - Design amélioré avec icône colorée selon rôle */}
+            {/* Header */}
             <div style={{ 
                 marginBottom: '35px',
                 display: 'flex',
@@ -195,9 +241,17 @@ function Propositions() {
                 justifyContent: 'space-between'
             }}>
                 <div>
-                    <h1 style={{ fontSize: '32px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '600' }}>
-    <FiAward style={{ color: '#ff6b6b' }} /> Suivi des Propositions
-</h1>
+                    <h1 style={{ 
+                        fontSize: '32px', 
+                        marginBottom: '10px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px', 
+                        fontWeight: '600',
+                        fontFamily: "'Quicksand', sans-serif"
+                    }}>
+                        <FiAward style={{ color: '#ff6b6b' }} /> Suivi des Propositions
+                    </h1>
                     <p style={{ color: textSecondary, fontSize: '16px', margin: 0 }}>
                         {isEtudiant 
                             ? 'Félicitations ! Ces entreprises souhaitent vous recruter définitivement. Examinez leurs offres.'
@@ -206,14 +260,22 @@ function Propositions() {
                 </div>
             </div>
 
-            {/* Notification Toast - Design amélioré */}
+            {/* Notification Toast */}
             {message && (
                 <div 
                     onClick={() => setMessage(null)} 
                     style={{
-                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(8px)',
-                        zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        position: 'fixed', 
+                        top: 0, 
+                        left: 0, 
+                        right: 0, 
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.4)', 
+                        backdropFilter: 'blur(8px)',
+                        zIndex: 9999, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
                         cursor: 'pointer'
                     }}
                 >
@@ -256,7 +318,7 @@ function Propositions() {
                 </div>
             )}
 
-            {/* Liste des propositions - Design amélioré */}
+            {/* Liste des propositions */}
             <div style={{ display: 'grid', gap: '18px' }}>
                 {propositions.length === 0 ? (
                     <div style={{ 
@@ -371,8 +433,8 @@ function Propositions() {
                                             fontWeight: 'bold'
                                         }}>
                                             {isEtudiant 
-                                                ? prop.entreprise?.charAt(0) || 'E'
-                                                : prop.candidatNom?.charAt(0) || 'C'}
+                                                ? prop.entreprise?.charAt(0).toUpperCase() || 'E'
+                                                : prop.candidatNom?.charAt(0).toUpperCase() || 'C'}
                                         </div>
                                         <div>
                                             <h3 style={{ 
@@ -389,28 +451,38 @@ function Propositions() {
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '6px',
-                                                marginTop: '2px'
+                                                marginTop: '2px',
+                                                flexWrap: 'wrap'
                                             }}>
                                                 {isEtudiant ? (
                                                     <>
-                                                        {icons.building}
-                                                        {prop.entreprise}
+                                                        <FiBriefcase size={14} />
+                                                        <span style={{ fontWeight: '500', color: textPrimary }}>
+                                                            {prop.entreprise || 'Entreprise inconnue'}
+                                                        </span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        {icons.user}
+                                                        <FiUser size={14} />
                                                         {prop.candidatNom}
-                                                        <span style={{ color: textMuted, fontSize: '12px', marginLeft: '4px' }}>
-                                                            (ID: {prop.etudiantId?.substring(0, 6)}...)
-                                                        </span>
                                                     </>
                                                 )}
                                             </div>
+                                            {isEtudiant && prop.localisation && (
+                                                <div style={{ 
+                                                    color: textMuted, 
+                                                    fontSize: '12px',
+                                                    marginTop: '2px'
+                                                }}>
+                                                    <FiMapPin size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                                                    {prop.localisation}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Partie droite - Actions (uniquement pour étudiants en attente) */}
+                                {/* Partie droite - Actions */}
                                 {isEtudiant && isPending && (
                                     <div style={{ 
                                         display: 'flex', 
@@ -486,13 +558,7 @@ function Propositions() {
                                         alignItems: 'center',
                                         gap: '6px'
                                     }}>
-                                        {isAccepted && <span style={{ color: '#10b981' }}>✅ Offre acceptée</span>}
-                                        {isRefused && <span style={{ color: '#ef4444' }}>❌ Offre déclinée</span>}
-                                        {isRecruteur && isPending && (
-                                            <span style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                {icons.hourglass} En attente de réponse
-                                            </span>
-                                        )}
+                                       
                                     </div>
                                 )}
                             </div>

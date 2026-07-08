@@ -230,28 +230,30 @@ function Dashboard() {
         return <FiMoon style={{ color: '#818cf8' }} />;
     };
 
-    if (loading) {
-        return (
-            <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                minHeight: '100vh',
-                width: '100%'
-            }}>
-                <div style={{ textAlign: 'center' }}>
-                    <FiTrendingUp size={50} style={{ 
-                        animation: 'spin 2s linear infinite', 
-                        marginBottom: '20px', 
-                        color: '#6c63ff' 
-                    }} />
-                    <p style={{ color: isDark ? 'rgba(255,255,255,0.6)' : '#64748b' }}>
-                        Chargement...
-                    </p>
-                </div>
-            </div>
-        );
-    }
+   // Replace the loading state in dashboard.jsx with this:
+if (loading) {
+    return (
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            width: '100%',
+            background: isDark ? '#0f172a' : '#f1f5f9',
+            color: isDark ? '#fefae0' : '#0f172a'
+        }}>
+            <FiTrendingUp size={50} style={{ 
+                animation: 'spin 2s linear infinite', 
+                marginBottom: '20px', 
+                color: '#6c63ff' 
+            }} />
+            <p style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                Chargement...
+            </p>
+        </div>
+    );
+}
 
     if (!user) {
         return (

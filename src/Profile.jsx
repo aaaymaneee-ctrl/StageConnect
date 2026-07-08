@@ -197,15 +197,25 @@ function Profile() {
     };
 
     if (loading) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div className="loading-spinner"></div>
-                    <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b' }}>Chargement du profil...</p>
-                </div>
-            </div>
-        );
-    }
+    return (
+        <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            minHeight: '100vh',
+            width: '100%',
+            background: isDark ? '#0f172a' : '#f1f5f9',
+            color: isDark ? '#fefae0' : '#0f172a'
+        }}>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>
+                Chargement du profil...
+            </p>
+        </div>
+    );
+}
+
 
     if (!user) {
         return (

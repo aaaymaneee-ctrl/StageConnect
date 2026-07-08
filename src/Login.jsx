@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
-import { FiMail, FiLock, FiLogIn, FiArrowRight, FiStar, FiAward } from 'react-icons/fi';
+import { FiMail, FiLock, FiLogIn, FiArrowRight, FiStar, FiAward, FiMinusCircle } from 'react-icons/fi';
 
 // Lamp Logo Component
 const LampLogo = ({ size = 40, color1 = '#6366f1', color2 = '#8b5cf6' }) => {
@@ -288,7 +288,7 @@ border: isDarkMode ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(139,
                             textAlign: 'center'
                         }}
                     >
-                        <div style={{ color: '#ef4444', marginBottom: '12px', fontSize: '40px' }}>⛔</div>
+                        <div style={{ color: '#ef4444', marginBottom: '12px', fontSize: '40px' }}><FiMinusCircle /></div>
                         <h3 style={{ color: '#ef4444', fontSize: '18px', marginBottom: '8px', fontWeight: 'bold' }}>
                             Compte Bloqué
                         </h3>

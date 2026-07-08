@@ -45,14 +45,24 @@ function Statistics() {
     }, []);
 
     if (loading) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: textPrimary }}>
-                <div style={{ animation: 'spin 1s linear infinite', marginRight: '10px' }}>{icons.activity}</div>
+    return (
+        <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            minHeight: '100vh',
+            width: '100%',
+            background: isDark ? '#0f172a' : '#f1f5f9',
+            color: isDark ? '#fefae0' : '#0f172a'
+        }}>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>
                 Chargement des statistiques...
-            </div>
-        );
-    }
-
+            </p>
+        </div>
+    );
+}
     if (error) {
         return <div style={{ color: '#ef4444', padding: '20px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '10px' }}>{error}</div>;
     }

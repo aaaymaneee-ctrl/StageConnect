@@ -213,6 +213,28 @@ function Users() {
     const modalBorder = isDark ? '1px solid rgba(255,255,255,0.15)' : '1px solid #e5e7eb';
     const overlayBg = isDark ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.4)';
 
+    // ========== LOADING STATE ==========
+    if (loading) {
+        return (
+            <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '100vh',
+                width: '100%',
+                background: isDark ? '#0f172a' : '#f1f5f9',
+                color: isDark ? '#fefae0' : '#0f172a'
+            }}>
+                <div className="loading-spinner"></div>
+                <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>
+                    Chargement des utilisateurs...
+                </p>
+            </div>
+        );
+    }
+
+    // ========== MAIN RENDER ==========
     return (
         <div style={{ color: isDark ? '#fefae0' : '#0f172a' }}>
             {/* Header with Icon */}
@@ -513,21 +535,8 @@ function Users() {
                 )}
             </div>
 
-            {/* Users Table */}
-            {loading ? (
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: '300px',
-                    color: textSecondary
-                }}>
-                    <div style={{ textAlign: 'center' }}>
-                        <div className="loading-spinner"></div>
-                        <p>Chargement des utilisateurs...</p>
-                    </div>
-                </div>
-            ) : users.length === 0 ? (
+            {/* Users Table - FIXED with flex layout */}
+            {users.length === 0 ? (
                 <div style={{
                     textAlign: 'center',
                     padding: '60px 20px',
@@ -548,10 +557,9 @@ function Users() {
                         overflow: 'hidden',
                         boxShadow: isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.04)'
                     }}>
+                        {/* Table Header - Flex layout */}
                         <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(180px, 1.5fr) minmax(180px, 1.5fr) minmax(100px, 1fr) minmax(120px, 1fr) minmax(100px, 1fr) minmax(160px, 1fr)',
-                            gap: '16px',
+                            display: 'flex',
                             padding: '16px 20px',
                             background: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
                             borderBottom: cardBorder,
@@ -559,16 +567,19 @@ function Users() {
                             color: textSecondary,
                             fontSize: '12px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px'
+                            letterSpacing: '0.5px',
+                            gap: '12px',
+                            minWidth: '900px'
                         }}>
-                            <span>Utilisateur</span>
-                            <span>Email</span>
-                            <span>Rôle</span>
-                            <span>Date inscription</span>
-                            <span>Statut</span>
-                            <span style={{ textAlign: 'center' }}>Actions</span>
+                            <div style={{ flex: '2', minWidth: '180px' }}>Utilisateur</div>
+                            <div style={{ flex: '2', minWidth: '180px' }}>Email</div>
+                            <div style={{ flex: '1', minWidth: '100px' }}>Rôle</div>
+                            <div style={{ flex: '1', minWidth: '120px' }}>Date inscription</div>
+                            <div style={{ flex: '1', minWidth: '100px' }}>Statut</div>
+                            <div style={{ flex: '1.5', minWidth: '160px', textAlign: 'center' }}>Actions</div>
                         </div>
 
+                        {/* Table Rows - Flex layout */}
                         {currentUsers.map((user, index) => (
                             <motion.div
                                 key={user._id}
@@ -576,12 +587,12 @@ function Users() {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.05 }}
                                 style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'minmax(180px, 1.5fr) minmax(180px, 1.5fr) minmax(100px, 1fr) minmax(120px, 1fr) minmax(100px, 1fr) minmax(160px, 1fr)',
-                                    gap: '16px',
-                                    padding: '16px 20px',
+                                    display: 'flex',
+                                    padding: '14px 20px',
                                     borderBottom: index < users.length - 1 ? cardBorder : 'none',
                                     alignItems: 'center',
+                                    gap: '12px',
+                                    minWidth: '900px',
                                     transition: 'background 0.2s ease'
                                 }}
                                 onMouseEnter={(e) => {
@@ -591,10 +602,12 @@ function Users() {
                                     e.currentTarget.style.background = 'transparent';
                                 }}
                             >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                {/* User Info */}
+                                <div style={{ flex: '2', minWidth: '180px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                     <div style={{
                                         width: '40px',
                                         height: '40px',
+                                        minWidth: '40px',
                                         borderRadius: '12px',
                                         background: `linear-gradient(135deg, ${getRoleColor(user.role)}, ${getRoleColor(user.role)}cc)`,
                                         display: 'flex',
@@ -604,14 +617,14 @@ function Users() {
                                         fontSize: '18px',
                                         fontWeight: 'bold'
                                     }}>
-                                        {user.prenom?.charAt(0) || 'U'}
+                                        {user.prenom?.charAt(0).toUpperCase() || 'U'}
                                     </div>
-                                    <div>
-                                        <div style={{ color: textPrimary, fontWeight: '500' }}>
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                        <div style={{ color: textPrimary, fontWeight: '500', fontSize: '14px' }}>
                                             {user.prenom} {user.nom}
                                         </div>
                                         {user.stats && (
-                                            <div style={{ color: textSecondary, fontSize: '11px', marginTop: '4px' }}>
+                                            <div style={{ color: textSecondary, fontSize: '11px', marginTop: '2px' }}>
                                                 {user.role === 'Etudiant' && (
                                                     <span>{user.stats.applicationsCount || 0} candidatures</span>
                                                 )}
@@ -622,8 +635,22 @@ function Users() {
                                         )}
                                     </div>
                                 </div>
-                                <div style={{ color: textSecondary, fontSize: '14px' }}>{user.email}</div>
-                                <div>
+
+                                {/* Email */}
+                                <div style={{ 
+                                    flex: '2', 
+                                    minWidth: '180px', 
+                                    color: textSecondary, 
+                                    fontSize: '13px', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis', 
+                                    whiteSpace: 'nowrap' 
+                                }}>
+                                    {user.email}
+                                </div>
+
+                                {/* Role */}
+                                <div style={{ flex: '1', minWidth: '100px' }}>
                                     <span style={{
                                         display: 'inline-flex',
                                         alignItems: 'center',
@@ -633,16 +660,21 @@ function Users() {
                                         background: `${getRoleColor(user.role)}20`,
                                         color: getRoleColor(user.role),
                                         fontSize: '12px',
-                                        fontWeight: '600'
+                                        fontWeight: '600',
+                                        whiteSpace: 'nowrap'
                                     }}>
                                         {getRoleIcon(user.role)}
                                         {getRoleLabel(user.role)}
                                     </span>
                                 </div>
-                                <div style={{ color: textSecondary, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <FiCalendar size={14} /> {formatDate(user.dateCreation)}
+
+                                {/* Date */}
+                                <div style={{ flex: '1', minWidth: '120px', color: textSecondary, fontSize: '13px' }}>
+                                    {formatDate(user.dateCreation)}
                                 </div>
-                                <div>
+
+                                {/* Status */}
+                                <div style={{ flex: '1', minWidth: '100px' }}>
                                     <span style={{
                                         display: 'inline-block',
                                         padding: '5px 12px',
@@ -652,35 +684,54 @@ function Users() {
                                         background: user.isBlocked 
                                             ? (isDark ? 'rgba(239,68,68,0.2)' : '#fef2f2')
                                             : (isDark ? 'rgba(16,185,129,0.2)' : '#f0fdf4'),
-                                        color: user.isBlocked ? '#ef4444' : '#10b981'
+                                        color: user.isBlocked ? '#ef4444' : '#10b981',
+                                        whiteSpace: 'nowrap'
                                     }}>
                                         {user.isBlocked ? 'Bloqué' : 'Actif'}
                                     </span>
                                     {user.blockedReason && user.isBlocked && (
-                                        <div style={{ fontSize: '10px', color: textSecondary, marginTop: '4px', maxWidth: '150px' }}>
-                                            Motif: {user.blockedReason.substring(0, 30)}...
+                                        <div style={{ 
+                                            fontSize: '10px', 
+                                            color: textSecondary, 
+                                            marginTop: '4px', 
+                                            maxWidth: '120px', 
+                                            overflow: 'hidden', 
+                                            textOverflow: 'ellipsis', 
+                                            whiteSpace: 'nowrap' 
+                                        }}>
+                                            Motif: {user.blockedReason.substring(0, 20)}...
                                         </div>
                                     )}
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                                    {user.role !== 'admin' && (
+
+                                {/* Actions */}
+                                <div style={{ 
+                                    flex: '1.5', 
+                                    minWidth: '160px', 
+                                    display: 'flex', 
+                                    gap: '6px', 
+                                    justifyContent: 'center', 
+                                    flexWrap: 'wrap' 
+                                }}>
+                                    {user.role !== 'admin' ? (
                                         <>
                                             {user.isBlocked ? (
                                                 <button
                                                     onClick={() => handleUnblockUser(user)}
                                                     style={{
-                                                        padding: '8px 16px',
+                                                        padding: '6px 14px',
                                                         background: isDark ? 'rgba(16,185,129,0.2)' : '#f0fdf4',
                                                         color: '#10b981',
                                                         border: isDark ? '1px solid rgba(16,185,129,0.3)' : '1px solid #bbf7d0',
                                                         borderRadius: '8px',
                                                         cursor: 'pointer',
-                                                        fontSize: '13px',
+                                                        fontSize: '12px',
                                                         fontWeight: '500',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '6px',
-                                                        transition: 'all 0.3s'
+                                                        gap: '4px',
+                                                        transition: 'all 0.3s',
+                                                        whiteSpace: 'nowrap'
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         e.currentTarget.style.transform = 'translateY(-2px)';
@@ -691,7 +742,7 @@ function Users() {
                                                         e.currentTarget.style.boxShadow = 'none';
                                                     }}
                                                 >
-                                                    <FiUserCheck size={14} /> Débloquer
+                                                    <FiUserCheck size={12} /> Débloquer
                                                 </button>
                                             ) : (
                                                 <button
@@ -700,18 +751,19 @@ function Users() {
                                                         setShowBlockModal(true);
                                                     }}
                                                     style={{
-                                                        padding: '8px 16px',
+                                                        padding: '6px 14px',
                                                         background: isDark ? 'rgba(239,68,68,0.2)' : '#fef2f2',
                                                         color: '#ef4444',
                                                         border: isDark ? '1px solid rgba(239,68,68,0.3)' : '1px solid #fecaca',
                                                         borderRadius: '8px',
                                                         cursor: 'pointer',
-                                                        fontSize: '13px',
+                                                        fontSize: '12px',
                                                         fontWeight: '500',
                                                         display: 'flex',
                                                         alignItems: 'center',
-                                                        gap: '6px',
-                                                        transition: 'all 0.3s'
+                                                        gap: '4px',
+                                                        transition: 'all 0.3s',
+                                                        whiteSpace: 'nowrap'
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         e.currentTarget.style.transform = 'translateY(-2px)';
@@ -722,7 +774,7 @@ function Users() {
                                                         e.currentTarget.style.boxShadow = 'none';
                                                     }}
                                                 >
-                                                    <FiLock size={14} /> Bloquer
+                                                    <FiLock size={12} /> Bloquer
                                                 </button>
                                             )}
                                             <button
@@ -731,18 +783,19 @@ function Users() {
                                                     setShowDeleteModal(true);
                                                 }}
                                                 style={{
-                                                    padding: '8px 16px',
+                                                    padding: '6px 14px',
                                                     background: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
                                                     color: textSecondary,
                                                     border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid #cbd5e1',
                                                     borderRadius: '8px',
                                                     cursor: 'pointer',
-                                                    fontSize: '13px',
+                                                    fontSize: '12px',
                                                     fontWeight: '500',
                                                     display: 'flex',
                                                     alignItems: 'center',
-                                                    gap: '6px',
-                                                    transition: 'all 0.3s'
+                                                    gap: '4px',
+                                                    transition: 'all 0.3s',
+                                                    whiteSpace: 'nowrap'
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     e.currentTarget.style.background = isDark ? 'rgba(239,68,68,0.2)' : '#fef2f2';
@@ -755,12 +808,16 @@ function Users() {
                                                     e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.2)' : '#cbd5e1';
                                                 }}
                                             >
-                                                <FiTrash2 size={14} /> Supprimer
+                                                <FiTrash2 size={12} /> Supprimer
                                             </button>
                                         </>
-                                    )}
-                                    {user.role === 'admin' && (
-                                        <span style={{ color: textSecondary, fontSize: '12px', fontStyle: 'italic' }}>
+                                    ) : (
+                                        <span style={{ 
+                                            color: textSecondary, 
+                                            fontSize: '11px', 
+                                            fontStyle: 'italic', 
+                                            whiteSpace: 'nowrap' 
+                                        }}>
                                             Actions limitées
                                         </span>
                                     )}
@@ -868,7 +925,7 @@ function Users() {
                 </>
             )}
 
-            {/* Delete Confirmation Modal - With ModalPortal */}
+            {/* Delete Confirmation Modal */}
             {showDeleteModal && selectedUser && (
                 <ModalPortal>
                     <motion.div
@@ -985,7 +1042,7 @@ function Users() {
                 </ModalPortal>
             )}
 
-            {/* Block Confirmation Modal - With ModalPortal */}
+            {/* Block Confirmation Modal */}
             {showBlockModal && selectedUser && (
                 <ModalPortal>
                     <motion.div

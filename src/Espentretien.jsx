@@ -1,4 +1,4 @@
-// EspEntretien.jsx - Fixed imports (removed FiFlame)
+// EspEntretien.jsx - Fixed imports and hooks
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from './ThemeContext.jsx';
@@ -10,8 +10,6 @@ import {
   FiTarget, FiCode, FiUserCheck, FiTrendingUp,
   FiAward, FiCpu, FiGlobe, FiBookOpen
 } from 'react-icons/fi';
-// Removed FiChat and FiFlame - they don't exist in react-icons/fi
-// FiFlame doesn't exist, using FiTrendingUp instead
 import { HiOutlineOfficeBuilding, HiOutlineCalendar } from 'react-icons/hi';
 
 function EspEntretien() {
@@ -28,9 +26,6 @@ function EspEntretien() {
     const [finalScore, setFinalScore] = useState(null);
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('info');
-    const [entretiensReels, setEntretiensReels] = useState([]);
-    const [showVideoLink, setShowVideoLink] = useState(false);
-    const [currentVideoLink, setCurrentVideoLink] = useState('');
 
     // Helper to get role color
     const getRoleColor = () => {
@@ -307,20 +302,36 @@ function EspEntretien() {
         window.open(lienVisio, '_blank');
     };
 
-    if (loading) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div className="loading-spinner"></div>
-                    <p style={{ color: isDark ? 'rgba(254,250,224,0.6)' : '#64748b' }}>Chargement...</p>
-                </div>
-            </div>
-        );
-    }
+if (loading) {
+    return (
+        <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            minHeight: '100vh',
+            width: '100%',
+            background: isDark ? '#0f172a' : '#f1f5f9',
+            color: isDark ? '#fefae0' : '#0f172a'
+        }}>
+            <div className="loading-spinner"></div>
+            <p style={{ marginTop: '15px', fontWeight: 'bold', fontSize: '16px' }}>
+                Chargement...
+            </p>
+        </div>
+    );
+}
 
     if (!user || user.role !== 'Etudiant') {
         return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                minHeight: '100vh',
+                width: '100%',
+                background: isDark ? '#0f172a' : '#f1f5f9'
+            }}>
                 <div style={{ 
                     textAlign: 'center', 
                     padding: '40px',
@@ -353,39 +364,38 @@ function EspEntretien() {
     }
 
     return (
-    <div style={{ color: isDark ? '#fefae0' : '#0f172a' }}>
-        {!selectedOffer ? (
-            <>
-                {/* Header with Icon */}
-                <div style={{ 
-                    marginBottom: '40px', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '15px',
-                    flexWrap: 'wrap'
-                }}>
-                    <div>
-                        <h1 style={{ 
-                            color: isDark ? '#fefae0' : '#0f172a', 
-                            fontSize: '32px', 
-                            marginBottom: '10px', 
-                            fontWeight: '700',
-                            fontFamily: "'Quicksand', sans-serif",
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px'
-                        }}>
-                            <FiVideo style={{ color: '#6366f1' }} /> Espace Entretien
-                        </h1>
-                        <p style={{ 
-                            color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
-                            fontSize: '16px' 
-                        }}>
-                            Préparez vos entretiens avec notre assistant IA pour les offres où votre candidature a été acceptée.
-                        </p>
+        <div style={{ color: isDark ? '#fefae0' : '#0f172a' }}>
+            {!selectedOffer ? (
+                <>
+                    {/* Header with Icon */}
+                    <div style={{ 
+                        marginBottom: '40px', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '15px',
+                        flexWrap: 'wrap'
+                    }}>
+                        <div>
+                            <h1 style={{ 
+                                color: isDark ? '#fefae0' : '#0f172a', 
+                                fontSize: '32px', 
+                                marginBottom: '10px', 
+                                fontWeight: '700',
+                                fontFamily: "'Quicksand', sans-serif",
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                            }}>
+                                <FiVideo style={{ color: '#6366f1' }} /> Espace Entretien
+                            </h1>
+                            <p style={{ 
+                                color: isDark ? 'rgba(254,250,224,0.5)' : '#64748b', 
+                                fontSize: '16px' 
+                            }}>
+                                Préparez vos entretiens avec notre assistant IA pour les offres où votre candidature a été acceptée.
+                            </p>
+                        </div>
                     </div>
-                </div>
-
 
                     {/* Message Toast */}
                     {message && (
@@ -507,29 +517,30 @@ function EspEntretien() {
                                             e.currentTarget.style.borderColor = isDark ? 'rgba(40, 167, 69, 0.2)' : '#bbf7d0';
                                         }
                                     }}>
-                                        {/* Live indicator */}
+                                        {/* Live indicator - SEPARATE from button */}
                                         {canJoin && (
                                             <div style={{
-                                                position: 'absolute',
-                                                top: '15px',
-                                                right: '15px',
-                                                background: '#ef4444',
-                                                color: 'white',
-                                                padding: '4px 14px',
-                                                borderRadius: '20px',
-                                                fontSize: '11px',
-                                                fontWeight: 'bold',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '6px',
-                                                animation: 'pulse 2s infinite'
+                                                gap: '8px',
+                                                background: '#ef4444',
+                                                color: 'white',
+                                                padding: '6px 16px',
+                                                borderRadius: '20px',
+                                                fontSize: '13px',
+                                                fontWeight: 'bold',
+                                                animation: 'pulse 2s infinite',
+                                                position: 'absolute',
+                                                top: '15px',
+                                                right: '15px'
                                             }}>
                                                 <span style={{
-                                                    width: '8px',
-                                                    height: '8px',
+                                                    width: '10px',
+                                                    height: '10px',
                                                     background: 'white',
                                                     borderRadius: '50%',
-                                                    display: 'inline-block'
+                                                    display: 'inline-block',
+                                                    animation: 'pulse 1.5s infinite'
                                                 }} />
                                                 EN DIRECT
                                             </div>
@@ -701,8 +712,8 @@ function EspEntretien() {
                                                 )}
                                             </div>
                                             
-                                            {/* Right side - Action Button */}
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+                                            {/* Right side - Action Buttons */}
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px', minWidth: '220px' }}>
                                                 {/* Real Interview - Join Button */}
                                                 {isRealInterview && hasCreneau && !interviewPassed && (
                                                     <button
@@ -714,6 +725,7 @@ function EspEntretien() {
                                                         }}
                                                         disabled={!canJoin || !offer.lienVisio}
                                                         style={{
+                                                            width: '100%',
                                                             padding: '14px 32px',
                                                             background: (canJoin && offer.lienVisio) 
                                                                 ? 'linear-gradient(135deg, #28a745, #20c997)'
@@ -730,19 +742,19 @@ function EspEntretien() {
                                                             boxShadow: (canJoin && offer.lienVisio) ? '0 4px 20px rgba(40, 167, 69, 0.4)' : 'none',
                                                             display: 'flex',
                                                             alignItems: 'center',
-                                                            gap: '8px',
-                                                            animation: (canJoin && offer.lienVisio) ? 'pulseButton 2s infinite' : 'none'
+                                                            justifyContent: 'center',
+                                                            gap: '8px'
                                                         }}
                                                         onMouseEnter={(e) => {
                                                             if (canJoin && offer.lienVisio) {
-                                                                e.target.style.transform = 'translateY(-2px)';
-                                                                e.target.style.boxShadow = '0 8px 30px rgba(40, 167, 69, 0.5)';
+                                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                                e.currentTarget.style.boxShadow = '0 8px 30px rgba(40, 167, 69, 0.5)';
                                                             }
                                                         }}
                                                         onMouseLeave={(e) => {
                                                             if (canJoin && offer.lienVisio) {
-                                                                e.target.style.transform = 'translateY(0)';
-                                                                e.target.style.boxShadow = '0 4px 20px rgba(40, 167, 69, 0.4)';
+                                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                                e.currentTarget.style.boxShadow = '0 4px 20px rgba(40, 167, 69, 0.4)';
                                                             }
                                                         }}
                                                     >
@@ -751,15 +763,25 @@ function EspEntretien() {
                                                     </button>
                                                 )}
                                                 
+                                                {/* Separator - only show if there are other buttons */}
+                                                {(isRealInterview && hasCreneau && !interviewPassed) && (
+                                                    <div style={{
+                                                        width: '100%',
+                                                        height: '1px',
+                                                        background: isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0',
+                                                        margin: '4px 0'
+                                                    }} />
+                                                )}
+                                                
                                                 {/* AI Interview - Start */}
-                                                {(!isRealInterview || offer.interviewType === 'ai') && 
-                                                 !offer.scoreEntretien && (
+                                                {(!isRealInterview || offer.interviewType === 'ai') && !offer.scoreEntretien && (
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleOpenChat(offer);
                                                         }}
                                                         style={{
+                                                            width: '100%',
                                                             padding: '14px 32px',
                                                             background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`,
                                                             color: 'white',
@@ -772,15 +794,16 @@ function EspEntretien() {
                                                             boxShadow: `0 4px 15px ${roleColor}40`,
                                                             display: 'flex',
                                                             alignItems: 'center',
+                                                            justifyContent: 'center',
                                                             gap: '8px'
                                                         }}
                                                         onMouseEnter={(e) => {
-                                                            e.target.style.transform = 'translateY(-2px)';
-                                                            e.target.style.boxShadow = `0 6px 20px ${roleColor}50`;
+                                                            e.currentTarget.style.transform = 'translateY(-2px)';
+                                                            e.currentTarget.style.boxShadow = `0 6px 20px ${roleColor}50`;
                                                         }}
                                                         onMouseLeave={(e) => {
-                                                            e.target.style.transform = 'translateY(0)';
-                                                            e.target.style.boxShadow = `0 4px 15px ${roleColor}40`;
+                                                            e.currentTarget.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.boxShadow = `0 4px 15px ${roleColor}40`;
                                                         }}
                                                     >
                                                         <FiCpu size={18} /> Commencer l'entretien IA
@@ -795,6 +818,7 @@ function EspEntretien() {
                                                             handleOpenChat(offer);
                                                         }}
                                                         style={{
+                                                            width: '100%',
                                                             padding: '14px 32px',
                                                             background: isDark ? 'rgba(108, 99, 255, 0.2)' : '#eef2ff',
                                                             color: '#6c63ff',
@@ -806,15 +830,16 @@ function EspEntretien() {
                                                             transition: 'all 0.3s',
                                                             display: 'flex',
                                                             alignItems: 'center',
+                                                            justifyContent: 'center',
                                                             gap: '8px'
                                                         }}
                                                         onMouseEnter={(e) => {
-                                                            e.target.style.background = isDark ? 'rgba(108, 99, 255, 0.3)' : '#e0e7ff';
-                                                            e.target.style.transform = 'translateY(-2px)';
+                                                            e.currentTarget.style.background = isDark ? 'rgba(108, 99, 255, 0.3)' : '#e0e7ff';
+                                                            e.currentTarget.style.transform = 'translateY(-2px)';
                                                         }}
                                                         onMouseLeave={(e) => {
-                                                            e.target.style.background = isDark ? 'rgba(108, 99, 255, 0.2)' : '#eef2ff';
-                                                            e.target.style.transform = 'translateY(0)';
+                                                            e.currentTarget.style.background = isDark ? 'rgba(108, 99, 255, 0.2)' : '#eef2ff';
+                                                            e.currentTarget.style.transform = 'translateY(0)';
                                                         }}
                                                     >
                                                         <FiBarChart2 size={18} /> Voir les résultats ({offer.scoreEntretien}%)
